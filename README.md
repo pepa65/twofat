@@ -2,7 +2,7 @@
 ## Two Factor Authentication Tool
 ### Manage a 2FA database from the commandline
 * **v0.1.2**
-* Repo [gitlab.com/pepa/twofat](https://gitlab.com/pepa65/twofat)
+* Repo [gitlab.com/pepa/twofat](https://github.com/pepa65/twofat)
 * After [github.com/slandx/tfat](https://github.com/slandx/tfat)
 
 ## Features
@@ -14,7 +14,7 @@
 ## Build
 ```shell
 # While in the repo root directory:
-go build
+go get -u github.com/pepa65/twofat
 ```
 
 ## Usage

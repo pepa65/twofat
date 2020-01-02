@@ -1,4 +1,4 @@
-module gitlab.com/pepa65/twofat
+module github.com/pepa65/twofat
 
 go 1.13
 
