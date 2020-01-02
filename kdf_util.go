@@ -1,4 +1,4 @@
-package twofat
+package main
 
 import (
 	"golang.org/x/crypto/argon2"
