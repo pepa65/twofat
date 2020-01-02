@@ -18,7 +18,7 @@ import (
 	"encoding/csv"
 )
 
-const maxNameLen = 24
+const maxNameLen = 25
 
 var (
 	showOnce bool
@@ -123,7 +123,8 @@ func clipCode(name string) {
 	exitOnError(err, "Can't generate code for " + name)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
-	fmt.Println("Code for " + name + " put on the clipboard")
+	left := 30 - time.Now().Unix() % 30
+	fmt.Printf("Code for %s put on the clipboard, valid for %ds/n", name, left)
 }
 
 func showCodes() {
@@ -140,7 +141,7 @@ func showCodes() {
 	}
 	sort.Strings(names)
 
-	fmtstr := " %8s %-" + strconv.Itoa(maxNameLen) + "s"
+	fmtstr := " %8s  %-" + strconv.Itoa(maxNameLen) + "s"
 	for true {
 		if !showOnce {
 			cls()
@@ -153,7 +154,7 @@ func showCodes() {
 			fmt.Printf(fmtstr, code, name)
 			if first {
 				first = false
-				fmt.Printf("   ")
+				fmt.Printf("    ")
 			} else {
 				fmt.Println()
 				first = true
