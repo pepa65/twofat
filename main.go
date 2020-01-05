@@ -44,17 +44,21 @@ func addEntry(name, secret string) error {
 	if len(name) == 0 || len(secret) == 0 {
 		exitOnError(errr, "invalid entry")
 	}
-	if len(name) > maxNameLen {
+	if len([]rune(name)) > maxNameLen {
 		exitOnError(errr, fmt.Sprintf("name longer than %d", maxNameLen))
 	}
 	db, err := readDb()
 	exitOnError(err, "Open data to manage entry failed")
 	action := "Added"
 	if _, found := db.Entries[name]; found {
-		if forceChange {
-			action = "Changed"
-		} else {
-			exitOnError(errr, "entry " + name + " already exists, use -f to force")
+		if !forceChange {
+			fmt.Printf("Entry " + name + "already exists, sure to change? [y/N] ")
+			reader := bufio.NewReader(os.Stdin)
+			cfm, _ := reader.ReadString('\n')
+			if cfm[0] != 'y' {
+				fmt.Println("Entry not changed")
+				return nil
+			}
 		}
 	}
 	if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
@@ -85,6 +89,15 @@ func deleteEntry(name string) {
 	db, err := readDb()
 	exitOnError(err, "Open database to delete entry failed")
 	if _, found := db.Entries[name]; found {
+		if !forceChange {
+			fmt.Printf("Sure to delete entry " + name + "? [y/N] ")
+			reader := bufio.NewReader(os.Stdin)
+			cfm, _ := reader.ReadString('\n')
+			if cfm[0] != 'y' {
+				fmt.Println("Entry not deleted")
+				return
+			}
+		}
 		delete(db.Entries, name)
 		err = saveDb(&db)
 		exitOnError(err, "Failed to delete entry")
@@ -108,9 +121,18 @@ func revealSecret(name string) {
 	db, err := readDb()
 	exitOnError(err, "Open database to reveal secret failed")
 	if secret := db.Entries[name].Secret; secret != "" {
+		// Handle Ctrl-C
+		signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
+		go func() {
+			<-interrupt
+			cls()
+			os.Exit(1)
+		}()
 		fmt.Printf("%s: %s\n", name, secret)
 		fmt.Printf("[Ctrl+C to exit] ")
-		<-interrupt
+		for true {
+			time.Sleep(time.Hour)
+		}
   } else {
     fmt.Printf("Entry %s not found\n", name)
 	}
@@ -141,6 +163,13 @@ func showCodes() {
 	}
 	sort.Strings(names)
 
+	// Handle Ctrl-C
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
+	go func() {
+		<-interrupt
+		cls()
+		os.Exit(1)
+	}()
 	fmtstr := " %8s  %-" + strconv.Itoa(maxNameLen) + "s"
 	for true {
 		if !showOnce {
@@ -156,9 +185,12 @@ func showCodes() {
 				first = false
 				fmt.Printf("    ")
 			} else {
-				fmt.Println()
 				first = true
+				fmt.Println()
 			}
+		}
+		if !first {
+			fmt.Println()
 		}
 		left := 30 - time.Now().Unix() % 30
 		for left > 0 {
@@ -230,18 +262,10 @@ func importEntries(filename string) error {
 }
 
 func main() {
-	// Handle Ctrl-C
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
-	go func() {
-		<-interrupt
-		cls()
-		os.Exit(1)
-	}()
-
 	app := cli.NewApp()
 	app.Name = "Two Factor Authentication Tool"
 	app.Usage = "Manage a 2FA database from the commandline"
-	app.Version = "0.1.2"
+	app.Version = "0.1.3"
 	app.UseShortOptionHandling = true
 	app.Action = func(c *cli.Context) error {
 		if len(c.Args()) != 0 {
@@ -330,6 +354,13 @@ func main() {
 				}
 				deleteEntry(c.Args().First())
 				return nil
+			},
+			Flags: []cli.Flag{
+				cli.BoolFlag{
+					Name: "f, force",
+					Usage: "Force deletion, don't ask for confirmation",
+					Destination: &forceChange,
+				},
 			},
 		}, {
 			Name: "password",
