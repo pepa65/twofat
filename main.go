@@ -296,7 +296,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "Two Factor Authentication Tool"
 	app.Usage = "Manage a 2FA database from the commandline"
-	app.Version = "0.1.3"
+	app.Version = "0.1.4"
 	app.UseShortOptionHandling = true
 	app.Action = func(c *cli.Context) error {
 		if len(c.Args()) != 0 {
@@ -309,7 +309,7 @@ func main() {
 	app.Commands = []cli.Command{
 		{
 			Name: "show",
-			UsageText: "twofat [show] [-o|--once]",
+			UsageText: "twofat [show [-o|--once]]",
 			Usage: "Show codes for all entries",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
@@ -384,7 +384,7 @@ func main() {
 			},
 		}, {
 			Name: "delete",
-			UsageText: "twofat delete NAME",
+			UsageText: "twofat delete [-f|--force] NAME",
 			Usage: "Delete entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
@@ -413,11 +413,11 @@ func main() {
 			},
 		}, {
 			Name: "import",
-			UsageText: "twofat import FILENAME.CSV",
-			Usage: "Import entries 'NAME,SECRET,CODELENGTH' from CSV file",
+			UsageText: "twofat import [-f|--force] CSVFILE",
+			Usage: "Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errr, "need 1 argument: FILENAME.CSV")
+					exitOnError(errr, "need 1 argument: CSVFILE")
 				}
 				importEntries(c.Args().First())
 				return nil

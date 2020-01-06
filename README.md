@@ -27,7 +27,7 @@ USAGE:
    twofat [global options] command [command options] [arguments...]
 
 VERSION:
-   0.1.3
+   0.1.4
 
 COMMANDS:
    show      Show codes for all entries
@@ -36,7 +36,7 @@ COMMANDS:
    clip      Put code of entry NAME onto the clipboard
    delete    Delete entry NAME
    password  Change password
-   import    Import entries 'NAME,SECRET,CODELENGTH' from CSV file
+   import    Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE
    help, h   Shows a list of commands or help for one command
 
 GLOBAL OPTIONS:
