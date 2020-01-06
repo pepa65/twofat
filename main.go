@@ -40,9 +40,24 @@ func exitOnError(err error, errMsg string) {
 	}
 }
 
+func checkBase32(secret string) (string, error) {
+	secret = strings.ToUpper(secret)
+	secret = strings.ReplaceAll(secret, "-", "")
+	secret = strings.ReplaceAll(secret, " ", "")
+	if len(secret) == 0 {
+		return secret, nil
+	}
+	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+	if e != nil {
+		fmt.Println("Invalid base32 [only characters 2-7 and A-Z, spaces and dashes ignored]")
+		return secret, e
+	}
+	return secret, nil
+}
+
 func addEntry(name, secret string) error {
-	if len(name) == 0 || len(secret) == 0 {
-		exitOnError(errr, "invalid entry")
+	if len(name) == 0 {
+		exitOnError(errr, "zero length entry name")
 	}
 	if len([]rune(name)) > maxNameLen {
 		exitOnError(errr, fmt.Sprintf("name longer than %d", maxNameLen))
@@ -52,7 +67,7 @@ func addEntry(name, secret string) error {
 	action := "Added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Entry " + name + "already exists, sure to change? [y/N] ")
+			fmt.Printf("Entry " + name + " already exists, sure to change? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
@@ -61,9 +76,19 @@ func addEntry(name, secret string) error {
 			}
 		}
 	}
-	if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
-			DecodeString(strings.ToUpper(secret)); err != nil {
-		exitOnError(err, "invalid base32 encoding")
+
+	secret, err = checkBase32(secret)
+	// If SECRET not supplied or invalid, ask for it
+	reader := bufio.NewReader(os.Stdin)
+	for len(secret) == 0 || err != nil {
+		fmt.Println("Enter base32 secret [enter empty field to cancel]: ")
+		secret, _ = reader.ReadString('\n')
+		secret = strings.TrimSuffix(secret, "\n")
+		secret, err = checkBase32(secret)
+		if len(secret) == 0 {
+			fmt.Println("Operation cancelled")
+			return nil
+		}
 	}
 
 	if digits7 && digits8 {
@@ -81,6 +106,7 @@ func addEntry(name, secret string) error {
 		Digits: digits,
 	}
 	saveDb(&db)
+	cls()
 	fmt.Printf("%s %s\n", action, name)
 	return nil
 }
@@ -120,27 +146,32 @@ func changePassword() {
 func revealSecret(name string) {
 	db, err := readDb()
 	exitOnError(err, "Open database to reveal secret failed")
-	if secret := db.Entries[name].Secret; secret != "" {
-		// Handle Ctrl-C
-		signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
-		go func() {
-			<-interrupt
-			cls()
-			os.Exit(1)
-		}()
-		fmt.Printf("%s: %s\n", name, secret)
-		fmt.Printf("[Ctrl+C to exit] ")
-		for true {
-			time.Sleep(time.Hour)
-		}
-  } else {
+	secret := db.Entries[name].Secret
+	if len(secret) == 0 {
     fmt.Printf("Entry %s not found\n", name)
+		return
+	}
+	// Handle Ctrl-C
+	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
+	go func() {
+		<-interrupt
+		cls()
+		os.Exit(1)
+	}()
+	fmt.Printf("%s: %s\n", name, secret)
+	fmt.Printf("[Ctrl+C to exit] ")
+	for true {
+		time.Sleep(time.Hour)
 	}
 }
 
 func clipCode(name string) {
 	db, err := readDb()
 	exitOnError(err, "Open database to clip code failed")
+	if secret := db.Entries[name].Secret; len(secret) == 0 {
+    fmt.Printf("Entry %s not found\n", name)
+		return
+	}
 	code, err := OneTimePassword(db.Entries[name].Secret)
 	exitOnError(err, "Can't generate code for " + name)
 	code = code[len(code)-db.Entries[name].Digits:]
@@ -296,13 +327,20 @@ func main() {
 			},
 		}, {
 			Name: "add",
-			UsageText: "twofat add [-7|-8] NAME SECRET",
+			UsageText: "twofat add [-7|-8] [-f|--force] NAME [SECRET]",
 			Usage: "Add a new entry NAME with SECRET",
 			Action: func(c *cli.Context) error {
-				if len(c.Args()) != 2 {
-					exitOnError(errr, "need 2 arguments: NAME & SECRET")
+				secret := ""
+				if len(c.Args()) < 1 {
+					exitOnError(errr, "need at least 1 argument: NAME")
 				}
-				addEntry(c.Args().First(), c.Args()[1])
+				if len(c.Args()) > 2 {
+					exitOnError(errr, "need at most 2 arguments: NAME & SECRET")
+				}
+				if len(c.Args()) == 2 {
+					secret = c.Args()[1]
+				}
+				addEntry(c.Args().First(), secret)
 				return nil
 			},
 			Flags: []cli.Flag{

@@ -62,7 +62,7 @@ func readDb() (Db, error) {
 		if pwdSet != 0 {
 			fmt.Printf("Enter password: ")
 			pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
-			fmt.Printf("\r                \r")
+			fmt.Println()
 		}
 		key := deriveKey(pwd, nonce, aesKeySize)
 		block, err := aes.NewCipher(key)
