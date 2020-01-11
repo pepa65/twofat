@@ -18,7 +18,10 @@ import (
 	"encoding/csv"
 )
 
-const maxNameLen = 25
+const (
+	version = "0.1.5"
+	maxNameLen = 25
+)
 
 var (
 	showOnce bool
@@ -296,7 +299,7 @@ func main() {
 	app := cli.NewApp()
 	app.Name = "Two Factor Authentication Tool"
 	app.Usage = "Manage a 2FA database from the commandline"
-	app.Version = "0.1.4"
+	app.Version = version
 	app.UseShortOptionHandling = true
 	app.Action = func(c *cli.Context) error {
 		if len(c.Args()) != 0 {

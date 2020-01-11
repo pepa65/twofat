@@ -1,15 +1,16 @@
 # twofat
 ## Two Factor Authentication Tool
 ### Manage a 2FA database from the commandline
-* **v0.1.3**
+* **v0.1.5**
 * Repo [gitlab.com/pepa/twofat](https://github.com/pepa65/twofat)
 * After [github.com/slandx/tfat](https://github.com/slandx/tfat)
 
 ## Features
-- Save data with AES-GCM encrypt.
-- Save data with password, generate random password if none provided.
+- Saves data with AES-GCM encrypt in ~/.<binaryname>.enc
+- Saves data with password, generate random password if none provided.
 - Auto-refreshing displayed codes.
-- Add code to clipboard.
+- Can add code to clipboard.
+- Can import entries from CSV.
 
 ## Build
 ```shell
@@ -27,7 +28,7 @@ USAGE:
    twofat [global options] command [command options] [arguments...]
 
 VERSION:
-   0.1.4
+   0.1.5
 
 COMMANDS:
    show      Show codes for all entries

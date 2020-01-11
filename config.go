@@ -5,6 +5,7 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
+	"strings"
 	"errors"
 	"fmt"
 	"io"
@@ -19,9 +20,13 @@ import (
 )
 
 const (
-	DbPath = ".twofat.enc"
 	aesKeySize uint32 = 32
 	nonceSize = 12
+)
+
+var (
+	dbPath string
+	errWrongPassword = errors.New("password error")
 )
 
 type Entry struct {
@@ -34,17 +39,18 @@ type Db struct {
 	Entries map[string]Entry
 }
 
-var (
-	dbPath = ""
-	errWrongPassword = errors.New("password error")
-)
-
 func init() {
 	usr, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
 	}
-	dbPath = path.Join(usr.HomeDir, DbPath)
+	self := os.Args[0]
+	i := strings.IndexByte(self, '/')
+	for i >= 0 {
+		self = self[i+1:]
+		i = strings.IndexByte(self, '/')
+	}
+	dbPath = path.Join(usr.HomeDir, "." + self + ".enc")
 }
 
 func readDb() (Db, error) {
@@ -91,7 +97,7 @@ func readDb() (Db, error) {
 	}
 
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println("Initializing database file")
+	fmt.Println("Initializing database file " + dbPath)
 	initPassword(&db)
 	db.Entries = make(map[string]Entry)
 	saveDb(&db)
