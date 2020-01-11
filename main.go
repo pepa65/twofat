@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	version = "0.1.6"
+	version = "0.1.7"
 	maxNameLen = 25
 )
 
@@ -108,8 +108,8 @@ func addEntry(name, secret string) error {
 		Secret: strings.ToUpper(secret),
 		Digits: digits,
 	}
-	saveDb(&db)
 	cls()
+	saveDb(&db)
 	fmt.Printf("%s %s\n", action, name)
 	return nil
 }
@@ -143,7 +143,7 @@ func changePassword() {
 	err = initPassword(&db)
 	exitOnError(err, "Failed to change password")
 	saveDb(&db)
-	fmt.Println("Password changed")
+	fmt.Println("Password change successful")
 }
 
 func revealSecret(name string) {

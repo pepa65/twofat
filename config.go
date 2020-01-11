@@ -22,6 +22,7 @@ import (
 const (
 	aesKeySize uint32 = 32
 	nonceSize = 12
+	pwRetry = 3
 )
 
 var (
@@ -57,21 +58,18 @@ func init() {
 func readDb() (Db, error) {
 	var db Db
 	if _, err := os.Stat(dbPath); err == nil {
+		// Database file present
 		dbdata, err := ioutil.ReadFile(dbPath)
 		if err != nil || len(dbdata) < nonceSize+1 {
 			return Db{}, errors.New("insufficient data in " + dbPath)
 		}
 
 		nonce := dbdata[:nonceSize]
-		pwd := nonce
-		pwdSet := dbdata[nonceSize]
-		encdata := dbdata[nonceSize+1:]
-		if pwdSet != 0 {
-			fmt.Printf("Enter password: ")
-			pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
-			fmt.Println()
-		}
-		key := deriveKey(pwd, nonce, aesKeySize)
+		encdata := dbdata[nonceSize:]
+		fmt.Printf("Enter password: ")
+		db.Pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
+		fmt.Println()
+		key := deriveKey(db.Pwd, nonce, aesKeySize)
 		block, err := aes.NewCipher(key)
 		if err != nil {
 			return Db{}, errWrongPassword
@@ -90,15 +88,12 @@ func readDb() (Db, error) {
 		if err != nil {
 			return Db{}, errors.New("invalid entry data")
 		}
-		if pwdSet == 0 {
-			pwd = []byte("")
-		}
-		db.Pwd = pwd
 		return db, nil
 	}
 
+	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println("Initializing database file " + dbPath)
+	fmt.Println("Initializing database file: " + dbPath)
 	initPassword(&db)
 	db.Entries = make(map[string]Entry)
 	saveDb(&db)
@@ -113,16 +108,8 @@ func saveDb(db *Db) error {
 		return errors.New("Could not get randomized data")
 	}
 
-	pwdSet := 0
-	pwd := nonce
-	if string(db.Pwd) != "" {
-		pwdSet = 1
-		pwd = db.Pwd
-	}
 	buf.Write(nonce)
-	buf.WriteByte(byte(pwdSet))
-
-	key := deriveKey(pwd, nonce, aesKeySize)
+	key := deriveKey(db.Pwd, nonce, aesKeySize)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return errWrongPassword
@@ -146,23 +133,27 @@ func saveDb(db *Db) error {
 }
 
 func initPassword(db *Db) error {
-	retryTimes := 4
+	retryTimes := pwRetry
 	for retryTimes > 0 {
 		fmt.Printf("New password: ")
-		newPwd, _ := terminal.ReadPassword(int(syscall.Stdin))
-		fmt.Printf("\nConfirm password: ")
-		confirmPwd, _ := terminal.ReadPassword(int(syscall.Stdin))
-		fmt.Println()
-		if bytes.Equal(newPwd, confirmPwd) {
-			db.Pwd = newPwd
-			return nil
+		pwd, _ := terminal.ReadPassword(int(syscall.Stdin))
+		if len(pwd) == 0 {
+			fmt.Printf("\nPassword can't be empty")
+		} else {
+			fmt.Printf("\nConfirm password: ")
+			pwdc, _ := terminal.ReadPassword(int(syscall.Stdin))
+			fmt.Println()
+			if bytes.Equal(pwd, pwdc) {
+				db.Pwd = pwd
+				return nil
+			}
+			fmt.Printf("Passwords not the same")
 		}
 		retryTimes--
-		if retryTimes == 1 {
-			fmt.Println("Not the same, last retry")
-		} else {
-			fmt.Println("Not the same, retry")
+		if retryTimes > 0 {
+			fmt.Printf(", retry")
 		}
+		fmt.Println()
 	}
 	return errWrongPassword
 }
