@@ -320,7 +320,8 @@ func main() {
 			Usage: "Show codes for all entries",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
-					exitOnError(errors.New(fmt.Sprint(c.Args())), "No arguments allowed")
+					exitOnError(errors.New(strings.Join(c.Args(), " ")),
+							"No arguments allowed for " + c.Command.Name)
 				}
 				showCodes()
 				return nil
@@ -418,7 +419,8 @@ func main() {
 			Usage: "Change password",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
-					exitOnError(errors.New(fmt.Sprint(c.Args())), "No arguments allowed")
+					exitOnError(errors.New(strings.Join(c.Args(), " ")),
+							"No arguments allowed for " + c.Command.Name)
 				}
 				changePassword()
 				return nil
