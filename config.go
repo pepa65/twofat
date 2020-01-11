@@ -25,6 +25,7 @@ const (
 )
 
 var (
+	self string
 	dbPath string
 	errWrongPassword = errors.New("password error")
 )
@@ -40,17 +41,17 @@ type Db struct {
 }
 
 func init() {
-	usr, err := user.Current()
+	user, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
 	}
-	self := os.Args[0]
+	self = os.Args[0]
 	i := strings.IndexByte(self, '/')
 	for i >= 0 {
 		self = self[i+1:]
 		i = strings.IndexByte(self, '/')
 	}
-	dbPath = path.Join(usr.HomeDir, "." + self + ".enc")
+	dbPath = path.Join(user.HomeDir, "." + self + ".enc")
 }
 
 func readDb() (Db, error) {

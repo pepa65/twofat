@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	version = "0.1.5"
+	version = "0.1.6"
 	maxNameLen = 25
 )
 
@@ -298,12 +298,15 @@ func importEntries(filename string) error {
 func main() {
 	app := cli.NewApp()
 	app.Name = "Two Factor Authentication Tool"
+	app.Description = "Manage a 2FA database from the commandline"
 	app.Usage = "Manage a 2FA database from the commandline"
 	app.Version = version
+	app.Author = "github.com/pepa65/twofat"
+	app.Email = "pepa65@passchier.net"
 	app.UseShortOptionHandling = true
 	app.Action = func(c *cli.Context) error {
 		if len(c.Args()) != 0 {
-			exitOnError(errr, "command not recognized")
+			exitOnError(errors.New(c.Args().First()), "Command not recognized")
 		}
 		showCodes()
 		return nil
@@ -312,11 +315,12 @@ func main() {
 	app.Commands = []cli.Command{
 		{
 			Name: "show",
-			UsageText: "twofat [show [-o|--once]]",
+			Aliases: []string{"view", "list", "ls"},
+			UsageText: self + " [show|view|list|ls [-o|--once]]",
 			Usage: "Show codes for all entries",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
-					exitOnError(errr, "No arguments allowed")
+					exitOnError(errors.New(fmt.Sprint(c.Args())), "No arguments allowed")
 				}
 				showCodes()
 				return nil
@@ -330,15 +334,16 @@ func main() {
 			},
 		}, {
 			Name: "add",
-			UsageText: "twofat add [-7|-8] [-f|--force] NAME [SECRET]",
+			Aliases: []string{"insert", "entry"},
+			UsageText: self + " add|insert|entry [-7|-8] [-f|--force] NAME [SECRET]",
 			Usage: "Add a new entry NAME with SECRET",
 			Action: func(c *cli.Context) error {
 				secret := ""
 				if len(c.Args()) < 1 {
-					exitOnError(errr, "need at least 1 argument: NAME")
+					exitOnError(errors.New("NAME"), "Need at least 1 argument")
 				}
 				if len(c.Args()) > 2 {
-					exitOnError(errr, "need at most 2 arguments: NAME & SECRET")
+					exitOnError(errors.New("NAME & SECRET"), "Need at most 2 arguments")
 				}
 				if len(c.Args()) == 2 {
 					secret = c.Args()[1]
@@ -365,33 +370,36 @@ func main() {
 			},
 		}, {
 			Name: "secret",
-			UsageText: "twofat secret NAME",
+			Aliases: []string{"reveal"},
+			UsageText: self + " secret|reveal NAME",
 			Usage: "Show secret of entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errr, "need 1 argument: NAME")
+					exitOnError(errors.New("NAME"), "Need 1 argument")
 				}
 				revealSecret(c.Args().First())
 				return nil
 			},
 		}, {
 			Name: "clip",
-			UsageText: "twofat clip NAME",
+			Aliases: []string{"copy", "cp"},
+			UsageText: self + " clip|copy|cp NAME",
 			Usage: "Put code of entry NAME onto the clipboard",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errr, "need 1 argument: NAME")
+					exitOnError(errors.New("NAME"), "Need 1 argument")
 				}
 				clipCode(c.Args().First())
 				return nil
 			},
 		}, {
 			Name: "delete",
-			UsageText: "twofat delete [-f|--force] NAME",
+			Aliases: []string{"remove", "rm"},
+			UsageText: self + " delete|remove|rm [-f|--force] NAME",
 			Usage: "Delete entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errr, "need 1 argument: NAME")
+					exitOnError(errors.New("NAME"), "Need 1 argument")
 				}
 				deleteEntry(c.Args().First())
 				return nil
@@ -405,22 +413,24 @@ func main() {
 			},
 		}, {
 			Name: "password",
-			UsageText: "twofat password",
+			Aliases: []string{"passwd", "pw"},
+			UsageText: self + " password|pw",
 			Usage: "Change password",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
-					exitOnError(errr, "no arguments allowed")
+					exitOnError(errors.New(fmt.Sprint(c.Args())), "No arguments allowed")
 				}
 				changePassword()
 				return nil
 			},
 		}, {
 			Name: "import",
-			UsageText: "twofat import [-f|--force] CSVFILE",
+			Aliases: []string{"csv"},
+			UsageText: self + " import|csv [-f|--force] CSVFILE",
 			Usage: "Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errr, "need 1 argument: CSVFILE")
+					exitOnError(errors.New("CSVFILE"), "Need 1 argument")
 				}
 				importEntries(c.Args().First())
 				return nil
@@ -428,7 +438,7 @@ func main() {
 			Flags: []cli.Flag{
 				cli.BoolFlag{
 					Name: "f, force",
-					Usage: "Force modification of existing entries",
+					Usage: "Force modification of any existing entries",
 					Destination: &forceChange,
 				},
 			},
@@ -437,11 +447,11 @@ func main() {
 
 	cli.HelpFlag = cli.BoolFlag{
 		Name: "help, h",
-		Usage: "Show this help",
+		Usage: "Show this help, or use after a command for command help",
 	}
 
 	cli.VersionFlag = cli.BoolFlag{
-		Name: "version, V",
+		Name: "version, V, v",
 		Usage: "Print version",
 	}
 
