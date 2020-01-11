@@ -1,7 +1,7 @@
 # twofat
 ## Two Factor Authentication Tool
 ### Manage a 2FA database from the commandline
-* **v0.1.7**
+* **v0.1.8**
 * Repo [gitlab.com/pepa/twofat](https://github.com/pepa65/twofat)
 * After [github.com/slandx/tfat](https://github.com/slandx/tfat)
 
@@ -21,13 +21,13 @@ go get -u github.com/pepa65/twofat
 `twofat help`:
 ```
 NAME:
-   Two Factor Authentication Tool - Manage a 2FA database from the commandline
+   twofat - Two Factor Authentication Tool
 
 USAGE:
    twofat [global options] command [command options] [arguments...]
 
 VERSION:
-   0.1.7
+   0.1.8
 
 DESCRIPTION:
    Manage a 2FA database from the commandline

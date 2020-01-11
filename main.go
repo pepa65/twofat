@@ -13,13 +13,15 @@ import (
 	"sort"
 	"errors"
 	"encoding/base32"
+	"crypto/hmac"
+	"crypto/sha1"
 	"github.com/urfave/cli"
 	"github.com/atotto/clipboard"
 	"encoding/csv"
 )
 
 const (
-	version = "0.1.7"
+	version = "0.1.8"
 	maxNameLen = 25
 )
 
@@ -38,27 +40,66 @@ func cls() {
 
 func exitOnError(err error, errMsg string) {
 	if err != nil {
-		fmt.Println(errMsg + ": " + err.Error())
+		fmt.Printf("%s: %s", errMsg, err.Error())
 		os.Exit(1)
 	}
 }
 
-func checkBase32(secret string) (string, error) {
+func toBytes(value int64) []byte {
+	var result []byte
+	mask := int64(0xFF)
+	shifts := [8]uint16{56, 48, 40, 32, 24, 16, 8, 0}
+	for _, shift := range shifts {
+		result = append(result, byte((value>>shift)&mask))
+	}
+	return result
+}
+
+func toUint32(bytes []byte) uint32 {
+	return (uint32(bytes[0])<<24) + (uint32(bytes[1])<<16) +
+			(uint32(bytes[2])<<8) + uint32(bytes[3])
+}
+
+func oneTimePassword(keyStr string) (string) {
+	byteSecret, err := base32.StdEncoding.WithPadding(base32.NoPadding).
+			DecodeString(keyStr)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err.Error())
+		os.Exit(2)
+	}
+	value := toBytes(time.Now().Unix() / 30)
+
+	// Sign the value using HMAC-SHA1
+	hmacSha1 := hmac.New(sha1.New, byteSecret)
+	hmacSha1.Write(value)
+	hash := hmacSha1.Sum(nil)
+	offset := hash[len(hash)-1] & 0x0F
+
+	// Get 32-bit chunk from the hash starting at offset
+	hashParts := hash[offset:offset+4]
+
+	// Ignore most significant bit 0x80 (RFC4226)
+	hashParts[0] = hashParts[0] & 0x7F
+	number := toUint32(hashParts)
+	return fmt.Sprintf("%08d", number)
+}
+
+func checkBase32(secret string) (string) {
 	secret = strings.ToUpper(secret)
 	secret = strings.ReplaceAll(secret, "-", "")
 	secret = strings.ReplaceAll(secret, " ", "")
 	if len(secret) == 0 {
-		return secret, nil
+		return ""
 	}
 	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 	if e != nil {
 		fmt.Println("Invalid base32 [only characters 2-7 and A-Z, spaces and dashes ignored]")
-		return secret, e
+		return ""
 	}
-	return secret, nil
+	return secret
 }
 
-func addEntry(name, secret string) error {
+func addEntry(name, secret string) {
 	if len(name) == 0 {
 		exitOnError(errr, "zero length entry name")
 	}
@@ -75,22 +116,22 @@ func addEntry(name, secret string) error {
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
 				fmt.Println("Entry not changed")
-				return nil
+				return
 			}
 		}
 	}
 
-	secret, err = checkBase32(secret)
+	secret = checkBase32(secret)
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
 	for len(secret) == 0 || err != nil {
 		fmt.Println("Enter base32 secret [enter empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
-		secret, err = checkBase32(secret)
+		secret = checkBase32(secret)
 		if len(secret) == 0 {
 			fmt.Println("Operation cancelled")
-			return nil
+			return
 		}
 	}
 
@@ -111,7 +152,7 @@ func addEntry(name, secret string) error {
 	cls()
 	saveDb(&db)
 	fmt.Printf("%s %s\n", action, name)
-	return nil
+	return
 }
 
 func deleteEntry(name string) {
@@ -159,7 +200,7 @@ func revealSecret(name string) {
 	go func() {
 		<-interrupt
 		cls()
-		os.Exit(1)
+		os.Exit(3)
 	}()
 	fmt.Printf("%s: %s\n", name, secret)
 	fmt.Printf("[Ctrl+C to exit] ")
@@ -175,8 +216,7 @@ func clipCode(name string) {
     fmt.Printf("Entry %s not found\n", name)
 		return
 	}
-	code, err := OneTimePassword(db.Entries[name].Secret)
-	exitOnError(err, "Can't generate code for " + name)
+	code := oneTimePassword(db.Entries[name].Secret)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
 	left := 30 - time.Now().Unix() % 30
@@ -191,7 +231,7 @@ func showCodes() {
 		return
 	}
 	// Prepare sort on name
-	names := make([]string, 0)
+	var names []string
 	for name := range db.Entries {
 		names = append(names, name)
 	}
@@ -202,7 +242,7 @@ func showCodes() {
 	go func() {
 		<-interrupt
 		cls()
-		os.Exit(1)
+		os.Exit(4)
 	}()
 	fmtstr := " %8s  %-" + strconv.Itoa(maxNameLen) + "s"
 	for true {
@@ -211,8 +251,7 @@ func showCodes() {
 		}
 		first := true
 		for _, name := range names {
-			code, err := OneTimePassword(db.Entries[name].Secret)
-			exitOnError(err, "Can't generate code for " + name)
+			code := oneTimePassword(db.Entries[name].Secret)
 			code = code[len(code)-db.Entries[name].Digits:]
 			fmt.Printf(fmtstr, code, name)
 			if first {
@@ -241,7 +280,7 @@ func showCodes() {
 	cls()
 }
 
-func importEntries(filename string) error {
+func importEntries(filename string) {
 	csvfile, err := os.Open(filename)
 	exitOnError(err, "Could not open filename " + filename)
 	reader := csv.NewReader(bufio.NewReader(csvfile))
@@ -292,21 +331,21 @@ func importEntries(filename string) error {
 	}
 	saveDb(&db)
 	fmt.Printf("All %d entries in %s successfully imported\n", n, filename)
-	return nil
+	return
 }
 
 func main() {
 	app := cli.NewApp()
-	app.Name = "Two Factor Authentication Tool"
+	app.Name = self
+	app.Usage = "Two Factor Authentication Tool"
 	app.Description = "Manage a 2FA database from the commandline"
-	app.Usage = "Manage a 2FA database from the commandline"
 	app.Version = version
 	app.Author = "github.com/pepa65/twofat"
 	app.Email = "pepa65@passchier.net"
 	app.UseShortOptionHandling = true
 	app.Action = func(c *cli.Context) error {
 		if len(c.Args()) != 0 {
-			exitOnError(errors.New(c.Args().First()), "Command not recognized")
+			return fmt.Errorf("Command not recognized: %s", c.Args()[1])
 		}
 		showCodes()
 		return nil
@@ -320,8 +359,7 @@ func main() {
 			Usage: "Show codes for all entries",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
-					exitOnError(errors.New(strings.Join(c.Args(), " ")),
-							"No arguments allowed for " + c.Command.Name)
+					return fmt.Errorf("No arguments allowed for %s: %s", c.Command.Name,								strings.Join(c.Args(), " "))
 				}
 				showCodes()
 				return nil
@@ -341,10 +379,10 @@ func main() {
 			Action: func(c *cli.Context) error {
 				secret := ""
 				if len(c.Args()) < 1 {
-					exitOnError(errors.New("NAME"), "Need at least 1 argument")
+					return fmt.Errorf("Need at least 1 argument: NAME")
 				}
 				if len(c.Args()) > 2 {
-					exitOnError(errors.New("NAME & SECRET"), "Need at most 2 arguments")
+					return fmt.Errorf("Need at most 2 arguments: NAME & SECRET")
 				}
 				if len(c.Args()) == 2 {
 					secret = c.Args()[1]
@@ -376,7 +414,7 @@ func main() {
 			Usage: "Show secret of entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errors.New("NAME"), "Need 1 argument")
+					return fmt.Errorf("Need 1 argument: NAME")
 				}
 				revealSecret(c.Args().First())
 				return nil
@@ -388,7 +426,7 @@ func main() {
 			Usage: "Put code of entry NAME onto the clipboard",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errors.New("NAME"), "Need 1 argument")
+					return fmt.Errorf("Need 1 argument: NAME")
 				}
 				clipCode(c.Args().First())
 				return nil
@@ -400,7 +438,7 @@ func main() {
 			Usage: "Delete entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errors.New("NAME"), "Need 1 argument")
+					return fmt.Errorf("Need 1 argument: NAME")
 				}
 				deleteEntry(c.Args().First())
 				return nil
@@ -419,8 +457,7 @@ func main() {
 			Usage: "Change password",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
-					exitOnError(errors.New(strings.Join(c.Args(), " ")),
-							"No arguments allowed for " + c.Command.Name)
+					return fmt.Errorf("No arguments allowed for %s: %s", c.Command.Name,								strings.Join(c.Args(), " "))
 				}
 				changePassword()
 				return nil
@@ -432,7 +469,7 @@ func main() {
 			Usage: "Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					exitOnError(errors.New("CSVFILE"), "Need 1 argument")
+					return fmt.Errorf("Need 1 argument: CSVFILE")
 				}
 				importEntries(c.Args().First())
 				return nil

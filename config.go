@@ -17,6 +17,7 @@ import (
 	"syscall"
 	"encoding/gob"
 	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/crypto/argon2"
 )
 
 const (
@@ -53,6 +54,10 @@ func init() {
 		i = strings.IndexByte(self, '/')
 	}
 	dbPath = path.Join(user.HomeDir, "." + self + ".enc")
+}
+
+func deriveKey(password []byte, salt []byte, hashLen uint32) (hashRaw []byte) {
+	return argon2.IDKey(password, salt, 3, 65536, 4, hashLen)
 }
 
 func readDb() (Db, error) {
@@ -107,7 +112,6 @@ func saveDb(db *Db) error {
 	if err != nil {
 		return errors.New("Could not get randomized data")
 	}
-
 	buf.Write(nonce)
 	key := deriveKey(db.Pwd, nonce, aesKeySize)
 	block, err := aes.NewCipher(key)
