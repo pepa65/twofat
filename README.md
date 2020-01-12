@@ -7,6 +7,7 @@
 
 ## Features
 * Data saved with AES-GCM encrypt in ~/.<binaryname>.enc
+* Display names matching regex.
 * Displayed codes auto-refresh.
 * Code to clipboard.
 * Import entries from CSV.
