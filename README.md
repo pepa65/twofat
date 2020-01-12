@@ -1,7 +1,7 @@
 # twofat
 ## Two Factor Authentication Tool
 ### Manage a 2FA database from the commandline
-* **v0.1.8**
+* **v0.1.9**
 * Repo [gitlab.com/pepa/twofat](https://github.com/pepa65/twofat)
 * After [github.com/slandx/tfat](https://github.com/slandx/tfat)
 
@@ -27,7 +27,7 @@ USAGE:
    twofat [global options] command [command options] [arguments...]
 
 VERSION:
-   0.1.8
+   0.1.9
 
 DESCRIPTION:
    Manage a 2FA database from the commandline
@@ -36,7 +36,7 @@ AUTHOR:
    github.com/pepa65/twofat <pepa65@passchier.net>
 
 COMMANDS:
-   show, view, list, ls  Show codes for all entries
+   show, view, list, ls  Show codes for all entries [that match REGEX]
    add, insert, entry    Add a new entry NAME with SECRET
    secret, reveal        Show secret of entry NAME
    clip, copy, cp        Put code of entry NAME onto the clipboard

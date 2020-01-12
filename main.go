@@ -10,6 +10,7 @@ import (
 	"time"
 	"strings"
 	"strconv"
+	"regexp"
 	"sort"
 	"errors"
 	"encoding/base32"
@@ -21,12 +22,11 @@ import (
 )
 
 const (
-	version = "0.1.8"
+	version = "0.1.9"
 	maxNameLen = 25
 )
 
 var (
-	showOnce bool
 	errr = errors.New("Error")
 	forceChange bool
 	digits7 bool
@@ -40,7 +40,7 @@ func cls() {
 
 func exitOnError(err error, errMsg string) {
 	if err != nil {
-		fmt.Printf("%s: %s", errMsg, err.Error())
+		fmt.Printf("%s: %s\n", errMsg, err.Error())
 		os.Exit(1)
 	}
 }
@@ -223,17 +223,24 @@ func clipCode(name string) {
 	fmt.Printf("Code for %s put on the clipboard, valid for %ds\n", name, left)
 }
 
-func showCodes() {
+func showCodes(regex string) {
 	db, err := readDb()
 	exitOnError(err, "Failed to read database")
-	if len(db.Entries) == 0 {
-		fmt.Println("No entries present")
-		return
-	}
-	// Prepare sort on name
+
+	// Match regex and sort on name
 	var names []string
 	for name := range db.Entries {
-		names = append(names, name)
+		if match, _ := regexp.MatchString(regex, name); match {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		fmt.Printf("No entries")
+		if regex != "" {
+			fmt.Printf(" matching regex '%s'", regex)
+		}
+		fmt.Println()
+		return
 	}
 	sort.Strings(names)
 
@@ -246,9 +253,7 @@ func showCodes() {
 	}()
 	fmtstr := " %8s  %-" + strconv.Itoa(maxNameLen) + "s"
 	for true {
-		if !showOnce {
-			cls()
-		}
+		cls()
 		first := true
 		for _, name := range names {
 			code := oneTimePassword(db.Entries[name].Secret)
@@ -267,12 +272,7 @@ func showCodes() {
 		}
 		left := 30 - time.Now().Unix() % 30
 		for left > 0 {
-			fmt.Printf("\rValidity: %2ds ", left)
-			if showOnce {
-				fmt.Println()
-				return
-			}
-			fmt.Printf("   [Ctrl+C to exit] ")
+			fmt.Printf("\rValidity: %2ds    [Ctrl+C to exit] ", left)
 			time.Sleep(time.Second)
 			left--
 		}
@@ -344,10 +344,14 @@ func main() {
 	app.Email = "pepa65@passchier.net"
 	app.UseShortOptionHandling = true
 	app.Action = func(c *cli.Context) error {
-		if len(c.Args()) != 0 {
-			return fmt.Errorf("Command not recognized: %s", c.Args()[1])
+		regex := ""
+		if len(c.Args()) > 1 {
+			return fmt.Errorf("Need at most 1 argument: REGEX\n")
 		}
-		showCodes()
+		if len(c.Args()) == 1 {
+			regex = c.Args()[0]
+		}
+		showCodes(regex)
 		return nil
 	}
 
@@ -355,21 +359,18 @@ func main() {
 		{
 			Name: "show",
 			Aliases: []string{"view", "list", "ls"},
-			UsageText: self + " [show|view|list|ls [-o|--once]]",
-			Usage: "Show codes for all entries",
+			UsageText: self + " [show|view|list|ls [REGEX]",
+			Usage: "Show codes for all entries [that match REGEX]",
 			Action: func(c *cli.Context) error {
-				if len(c.Args()) != 0 {
-					return fmt.Errorf("No arguments allowed for %s: %s", c.Command.Name,								strings.Join(c.Args(), " "))
+				regex := ""
+				if len(c.Args()) > 1 {
+					return fmt.Errorf("Need at most 1 argument: REGEX\n")
 				}
-				showCodes()
+				if len(c.Args()) == 1 {
+					regex = c.Args()[0]
+				}
+				showCodes(regex)
 				return nil
-			},
-			Flags: []cli.Flag{
-				cli.BoolFlag{
-					Name: "o, once",
-					Usage: "Just show current codes once",
-					Destination: &showOnce,
-				},
 			},
 		}, {
 			Name: "add",
@@ -379,15 +380,15 @@ func main() {
 			Action: func(c *cli.Context) error {
 				secret := ""
 				if len(c.Args()) < 1 {
-					return fmt.Errorf("Need at least 1 argument: NAME")
+					return fmt.Errorf("Need at least 1 argument: NAME\n")
 				}
 				if len(c.Args()) > 2 {
-					return fmt.Errorf("Need at most 2 arguments: NAME & SECRET")
+					return fmt.Errorf("Need at most 2 arguments: NAME & SECRET\n")
 				}
 				if len(c.Args()) == 2 {
 					secret = c.Args()[1]
 				}
-				addEntry(c.Args().First(), secret)
+				addEntry(c.Args()[0], secret)
 				return nil
 			},
 			Flags: []cli.Flag{
@@ -414,9 +415,9 @@ func main() {
 			Usage: "Show secret of entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					return fmt.Errorf("Need 1 argument: NAME")
+					return fmt.Errorf("Need 1 argument: NAME\n")
 				}
-				revealSecret(c.Args().First())
+				revealSecret(c.Args()[0])
 				return nil
 			},
 		}, {
@@ -426,9 +427,9 @@ func main() {
 			Usage: "Put code of entry NAME onto the clipboard",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					return fmt.Errorf("Need 1 argument: NAME")
+					return fmt.Errorf("Need 1 argument: NAME\n")
 				}
-				clipCode(c.Args().First())
+				clipCode(c.Args()[0])
 				return nil
 			},
 		}, {
@@ -438,9 +439,9 @@ func main() {
 			Usage: "Delete entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					return fmt.Errorf("Need 1 argument: NAME")
+					return fmt.Errorf("Need 1 argument: NAME\n")
 				}
-				deleteEntry(c.Args().First())
+				deleteEntry(c.Args()[0])
 				return nil
 			},
 			Flags: []cli.Flag{
@@ -457,7 +458,7 @@ func main() {
 			Usage: "Change password",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
-					return fmt.Errorf("No arguments allowed for %s: %s", c.Command.Name,								strings.Join(c.Args(), " "))
+					return fmt.Errorf("No arguments allowed\n")
 				}
 				changePassword()
 				return nil
@@ -469,9 +470,9 @@ func main() {
 			Usage: "Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
-					return fmt.Errorf("Need 1 argument: CSVFILE")
+					return fmt.Errorf("Need 1 argument: CSVFILE\n")
 				}
-				importEntries(c.Args().First())
+				importEntries(c.Args()[0])
 				return nil
 			},
 			Flags: []cli.Flag{
@@ -483,17 +484,14 @@ func main() {
 			},
 		},
 	}
-
 	cli.HelpFlag = cli.BoolFlag{
 		Name: "help, h",
 		Usage: "Show this help, or use after a command for command help",
 	}
-
 	cli.VersionFlag = cli.BoolFlag{
 		Name: "version, V, v",
 		Usage: "Print version",
 	}
-
 	err := app.Run(os.Args)
 	if err != nil {
 		exitOnError(err, "Error")
