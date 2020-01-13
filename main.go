@@ -1,24 +1,24 @@
 package main
 
 import (
-	"fmt"
-	"os"
-	"os/signal"
-	"io"
 	"bufio"
-	"syscall"
-	"time"
-	"strings"
-	"strconv"
-	"regexp"
-	"sort"
-	"errors"
-	"encoding/base32"
 	"crypto/hmac"
 	"crypto/sha1"
-	"github.com/urfave/cli"
-	"github.com/atotto/clipboard"
+	"encoding/base32"
 	"encoding/csv"
+	"errors"
+	"fmt"
+	"github.com/atotto/clipboard"
+	"github.com/urfave/cli"
+	"io"
+	"os"
+	"os/signal"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
+	"syscall"
+	"time"
 )
 
 const (
@@ -56,11 +56,11 @@ func toBytes(value int64) []byte {
 }
 
 func toUint32(bytes []byte) uint32 {
-	return (uint32(bytes[0])<<24) + (uint32(bytes[1])<<16) +
-			(uint32(bytes[2])<<8) + uint32(bytes[3])
+	return (uint32(bytes[0])<<24)+(uint32(bytes[1])<<16)+(uint32(bytes[2])<<8)+
+			uint32(bytes[3])
 }
 
-func oneTimePassword(keyStr string) (string) {
+func oneTimePassword(keyStr string) string {
 	byteSecret, err := base32.StdEncoding.WithPadding(base32.NoPadding).
 			DecodeString(keyStr)
 	if err != nil {
@@ -84,7 +84,7 @@ func oneTimePassword(keyStr string) (string) {
 	return fmt.Sprintf("%08d", number)
 }
 
-func checkBase32(secret string) (string) {
+func checkBase32(secret string) string {
 	secret = strings.ToUpper(secret)
 	secret = strings.ReplaceAll(secret, "-", "")
 	secret = strings.ReplaceAll(secret, " ", "")
@@ -111,7 +111,7 @@ func addEntry(name, secret string) {
 	action := "Added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Entry " + name + " already exists, sure to change? [y/N] ")
+			fmt.Printf("Entry "+name+" already exists, sure to change? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
@@ -160,7 +160,7 @@ func deleteEntry(name string) {
 	exitOnError(err, "Open database to delete entry failed")
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Sure to delete entry " + name + "? [y/N] ")
+			fmt.Printf("Sure to delete entry "+name+"? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
@@ -171,7 +171,7 @@ func deleteEntry(name string) {
 		delete(db.Entries, name)
 		err = saveDb(&db)
 		exitOnError(err, "Failed to delete entry")
-		fmt.Println("Entry " + name + " deleted")
+		fmt.Println("Entry "+name+" deleted")
 	} else {
 		fmt.Printf("Entry %s not found\n", name)
 	}
@@ -192,7 +192,7 @@ func revealSecret(name string) {
 	exitOnError(err, "Open database to reveal secret failed")
 	secret := db.Entries[name].Secret
 	if len(secret) == 0 {
-    fmt.Printf("Entry %s not found\n", name)
+		fmt.Printf("Entry %s not found\n", name)
 		return
 	}
 	// Handle Ctrl-C
@@ -213,13 +213,13 @@ func clipCode(name string) {
 	db, err := readDb()
 	exitOnError(err, "Open database to clip code failed")
 	if secret := db.Entries[name].Secret; len(secret) == 0 {
-    fmt.Printf("Entry %s not found\n", name)
+		fmt.Printf("Entry %s not found\n", name)
 		return
 	}
 	code := oneTimePassword(db.Entries[name].Secret)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
-	left := 30 - time.Now().Unix() % 30
+	left := 30-time.Now().Unix()%30
 	fmt.Printf("Code for %s put on the clipboard, valid for %ds\n", name, left)
 }
 
@@ -251,7 +251,7 @@ func showCodes(regex string) {
 		cls()
 		os.Exit(4)
 	}()
-	fmtstr := " %8s  %-" + strconv.Itoa(maxNameLen) + "s"
+	fmtstr := " %8s  %-"+strconv.Itoa(maxNameLen)+"s"
 	for true {
 		cls()
 		first := true
@@ -270,7 +270,7 @@ func showCodes(regex string) {
 		if !first {
 			fmt.Println()
 		}
-		left := 30 - time.Now().Unix() % 30
+		left := 30-time.Now().Unix()%30
 		for left > 0 {
 			fmt.Printf("\rValidity: %2ds    [Ctrl+C to exit] ", left)
 			time.Sleep(time.Second)
@@ -282,7 +282,7 @@ func showCodes(regex string) {
 
 func importEntries(filename string) {
 	csvfile, err := os.Open(filename)
-	exitOnError(err, "Could not open filename " + filename)
+	exitOnError(err, "Could not open filename "+filename)
 	reader := csv.NewReader(bufio.NewReader(csvfile))
 	db, err := readDb()
 	exitOnError(err, "Open data to import entries failed")
@@ -298,31 +298,31 @@ func importEntries(filename string) {
 		if err == io.EOF {
 			break
 		}
-		exitOnError(err, "error reading csv data on line " + ns)
+		exitOnError(err, "error reading csv data on line "+ns)
 		if len(line) != 3 {
-			exitOnError(errr, "no 2 fields on line " + ns)
+			exitOnError(errr, "no 2 fields on line "+ns)
 		}
 		name = line[0]
 		secret = line[1]
 		digits, err = strconv.Atoi(line[2])
-		exitOnError(err, "Not an integer on line " + ns + ": " + line[2])
+		exitOnError(err, "Not an integer on line "+ns+": "+line[2])
 		if len(name) == 0 || len(secret) == 0 {
-			exitOnError(errr, "empty field on line " + ns)
+			exitOnError(errr, "empty field on line "+ns)
 		}
 		if len(name) > maxNameLen {
 			exitOnError(errr,
 					fmt.Sprintf("name longer than %d on line %d", maxNameLen, n))
 		}
 		if _, found := db.Entries[name]; found && !forceChange {
-			exitOnError(errr, "entry " + name + " on line " + ns +
+			exitOnError(errr, "entry "+name+" on line "+ns+
 					" already exists, use -f to force")
 		}
 		if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
 				DecodeString(strings.ToUpper(secret)); err != nil {
-			exitOnError(err, "invalid base32 encoding on line " + ns)
+			exitOnError(err, "invalid base32 encoding on line "+ns)
 		}
 		if digits < 6 || digits > 8 {
-			exitOnError(errr, "Digits not 6, 7 or 8 on line " + ns)
+			exitOnError(errr, "Digits not 6, 7 or 8 on line "+ns)
 		}
 		db.Entries[name] = Entry{
 			Secret: strings.ToUpper(secret),
@@ -359,7 +359,7 @@ func main() {
 		{
 			Name: "show",
 			Aliases: []string{"view", "list", "ls"},
-			UsageText: self + " [show|view|list|ls [REGEX]",
+			UsageText: self+" [show|view|list|ls [REGEX]",
 			Usage: "Show codes for all entries [that match REGEX]",
 			Action: func(c *cli.Context) error {
 				regex := ""
@@ -375,7 +375,7 @@ func main() {
 		}, {
 			Name: "add",
 			Aliases: []string{"insert", "entry"},
-			UsageText: self + " add|insert|entry [-7|-8] [-f|--force] NAME [SECRET]",
+			UsageText: self+" add|insert|entry [-7|-8] [-f|--force] NAME [SECRET]",
 			Usage: "Add a new entry NAME with SECRET",
 			Action: func(c *cli.Context) error {
 				secret := ""
@@ -411,7 +411,7 @@ func main() {
 		}, {
 			Name: "secret",
 			Aliases: []string{"reveal"},
-			UsageText: self + " secret|reveal NAME",
+			UsageText: self+" secret|reveal NAME",
 			Usage: "Show secret of entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
@@ -423,7 +423,7 @@ func main() {
 		}, {
 			Name: "clip",
 			Aliases: []string{"copy", "cp"},
-			UsageText: self + " clip|copy|cp NAME",
+			UsageText: self+" clip|copy|cp NAME",
 			Usage: "Put code of entry NAME onto the clipboard",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
@@ -435,7 +435,7 @@ func main() {
 		}, {
 			Name: "delete",
 			Aliases: []string{"remove", "rm"},
-			UsageText: self + " delete|remove|rm [-f|--force] NAME",
+			UsageText: self+" delete|remove|rm [-f|--force] NAME",
 			Usage: "Delete entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
@@ -454,7 +454,7 @@ func main() {
 		}, {
 			Name: "password",
 			Aliases: []string{"passwd", "pw"},
-			UsageText: self + " password|pw",
+			UsageText: self+" password|pw",
 			Usage: "Change password",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
@@ -466,7 +466,7 @@ func main() {
 		}, {
 			Name: "import",
 			Aliases: []string{"csv"},
-			UsageText: self + " import|csv [-f|--force] CSVFILE",
+			UsageText: self+" import|csv [-f|--force] CSVFILE",
 			Usage: "Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {

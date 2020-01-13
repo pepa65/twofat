@@ -5,19 +5,19 @@ import (
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
-	"strings"
+	"encoding/gob"
 	"errors"
 	"fmt"
+	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"io/ioutil"
 	"log"
 	"os"
 	"os/user"
 	"path"
+	"strings"
 	"syscall"
-	"encoding/gob"
-	"golang.org/x/crypto/ssh/terminal"
-	"golang.org/x/crypto/argon2"
 )
 
 const (
@@ -53,7 +53,7 @@ func init() {
 		self = self[i+1:]
 		i = strings.IndexByte(self, '/')
 	}
-	dbPath = path.Join(user.HomeDir, "." + self + ".enc")
+	dbPath = path.Join(user.HomeDir, "."+self+".enc")
 }
 
 func deriveKey(password []byte, salt []byte, hashLen uint32) (hashRaw []byte) {
@@ -66,7 +66,7 @@ func readDb() (Db, error) {
 		// Database file present
 		dbdata, err := ioutil.ReadFile(dbPath)
 		if err != nil || len(dbdata) < nonceSize+1 {
-			return Db{}, errors.New("insufficient data in " + dbPath)
+			return Db{}, errors.New("insufficient data in "+dbPath)
 		}
 
 		nonce := dbdata[:nonceSize]
@@ -98,7 +98,7 @@ func readDb() (Db, error) {
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println("Initializing database file: " + dbPath)
+	fmt.Println("Initializing database file: "+dbPath)
 	initPassword(&db)
 	db.Entries = make(map[string]Entry)
 	saveDb(&db)
