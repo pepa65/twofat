@@ -32,14 +32,14 @@ var (
 	errWrongPassword = errors.New("password error")
 )
 
-type Entry struct {
+type entry struct {
 	Secret string
 	Digits int
 }
 
-type Db struct {
+type dbase struct {
 	Pwd []byte
-	Entries map[string]Entry
+	Entries map[string]entry
 }
 
 func init() {
@@ -60,13 +60,13 @@ func deriveKey(password []byte, salt []byte, hashLen uint32) (hashRaw []byte) {
 	return argon2.IDKey(password, salt, 3, 65536, 4, hashLen)
 }
 
-func readDb() (Db, error) {
-	var db Db
+func readDb() (dbase, error) {
+	var db dbase
 	if _, err := os.Stat(dbPath); err == nil {
 		// Database file present
 		dbdata, err := ioutil.ReadFile(dbPath)
 		if err != nil || len(dbdata) < nonceSize+1 {
-			return Db{}, errors.New("insufficient data in "+dbPath)
+			return dbase{}, errors.New("insufficient data in "+dbPath)
 		}
 
 		nonce := dbdata[:nonceSize]
@@ -77,21 +77,21 @@ func readDb() (Db, error) {
 		key := deriveKey(db.Pwd, nonce, aesKeySize)
 		block, err := aes.NewCipher(key)
 		if err != nil {
-			return Db{}, errWrongPassword
+			return dbase{}, errWrongPassword
 		}
 		aesGcm, err := cipher.NewGCM(block)
 		if err != nil {
-			return Db{}, errWrongPassword
+			return dbase{}, errWrongPassword
 		}
 		decryptedData, err := aesGcm.Open(nil, nonce, encdata, nil)
 		if err != nil {
-			return Db{}, errWrongPassword
+			return dbase{}, errWrongPassword
 		}
 
 		buf := bytes.NewBuffer(decryptedData)
 		err = gob.NewDecoder(buf).Decode(&db.Entries)
 		if err != nil {
-			return Db{}, errors.New("invalid entry data")
+			return dbase{}, errors.New("invalid entry data")
 		}
 		return db, nil
 	}
@@ -100,12 +100,12 @@ func readDb() (Db, error) {
 	os.MkdirAll(path.Dir(dbPath), 0700)
 	fmt.Println("Initializing database file: "+dbPath)
 	initPassword(&db)
-	db.Entries = make(map[string]Entry)
+	db.Entries = make(map[string]entry)
 	saveDb(&db)
 	return db, nil
 }
 
-func saveDb(db *Db) error {
+func saveDb(db *dbase) error {
 	var buf bytes.Buffer
 	nonce := make([]byte, nonceSize)
 	_, err := io.ReadFull(rand.Reader, nonce)
@@ -136,7 +136,7 @@ func saveDb(db *Db) error {
 	return nil
 }
 
-func initPassword(db *Db) error {
+func initPassword(db *dbase) error {
 	retryTimes := pwRetry
 	for retryTimes > 0 {
 		fmt.Printf("New password: ")

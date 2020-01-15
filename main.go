@@ -145,7 +145,7 @@ func addEntry(name, secret string) {
 	if digits8 {
 		digits = 8
 	}
-	db.Entries[name] = Entry{
+	db.Entries[name] = entry{
 		Secret: strings.ToUpper(secret),
 		Digits: digits,
 	}
@@ -195,6 +195,9 @@ func revealSecret(name string) {
 		fmt.Printf("Entry %s not found\n", name)
 		return
 	}
+	fmt.Printf("%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n",
+		name, secret, secret, db.Entries[name].Digits)
+	fmt.Printf("[Ctrl+C to exit] ")
 	// Handle Ctrl-C
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	go func() {
@@ -202,8 +205,6 @@ func revealSecret(name string) {
 		cls()
 		os.Exit(3)
 	}()
-	fmt.Printf("%s: %s\n", name, secret)
-	fmt.Printf("[Ctrl+C to exit] ")
 	for true {
 		time.Sleep(time.Hour)
 	}
@@ -324,7 +325,7 @@ func importEntries(filename string) {
 		if digits < 6 || digits > 8 {
 			exitOnError(errr, "Digits not 6, 7 or 8 on line "+ns)
 		}
-		db.Entries[name] = Entry{
+		db.Entries[name] = entry{
 			Secret: strings.ToUpper(secret),
 			Digits: digits,
 		}
