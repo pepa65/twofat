@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version = "0.1.9"
+	version = "0.2.0"
 	maxNameLen = 25
 )
 
@@ -339,7 +339,8 @@ func main() {
 	app := cli.NewApp()
 	app.Name = self
 	app.Usage = "Two Factor Authentication Tool"
-	app.Description = "Manage a 2FA database from the commandline"
+	app.Description = "Manage a 2FA database from the commandline\n"+
+		"   Database: "+dbPath
 	app.Version = version
 	app.Author = "github.com/pepa65/twofat"
 	app.Email = "pepa65@passchier.net"
