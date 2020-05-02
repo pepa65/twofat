@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version = "0.2.0"
+	version = "0.2.1"
 	maxNameLen = 25
 )
 
@@ -221,7 +221,7 @@ func clipCode(name string) {
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
 	left := 30-time.Now().Unix()%30
-	fmt.Printf("Code for %s put on the clipboard, valid for %ds\n", name, left)
+	fmt.Printf("%s code copied, valididity: %ds\n", name, left)
 }
 
 func showCodes(regex string) {
