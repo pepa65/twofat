@@ -8,8 +8,6 @@ import (
 	"encoding/gob"
 	"errors"
 	"fmt"
-	"golang.org/x/crypto/argon2"
-	"golang.org/x/crypto/ssh/terminal"
 	"io"
 	"io/ioutil"
 	"log"
@@ -18,17 +16,20 @@ import (
 	"path"
 	"strings"
 	"syscall"
+
+	"golang.org/x/crypto/argon2"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 const (
 	aesKeySize uint32 = 32
-	nonceSize = 12
-	pwRetry = 3
+	nonceSize         = 12
+	pwRetry           = 3
 )
 
 var (
-	self string
-	dbPath string
+	self             string
+	dbPath           string
 	errWrongPassword = errors.New("password error")
 )
 
@@ -38,7 +39,7 @@ type entry struct {
 }
 
 type dbase struct {
-	Pwd []byte
+	Pwd     []byte
 	Entries map[string]entry
 }
 
@@ -66,7 +67,7 @@ func readDb() (dbase, error) {
 		// Database file present
 		dbdata, err := ioutil.ReadFile(dbPath)
 		if err != nil || len(dbdata) < nonceSize+1 {
-			return dbase{}, errors.New("insufficient data in "+dbPath)
+			return dbase{}, errors.New("insufficient data in " + dbPath)
 		}
 
 		nonce := dbdata[:nonceSize]
@@ -98,7 +99,7 @@ func readDb() (dbase, error) {
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println("Initializing database file: "+dbPath)
+	fmt.Println("Initializing database file: " + dbPath)
 	initPassword(&db)
 	db.Entries = make(map[string]entry)
 	saveDb(&db)

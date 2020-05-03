@@ -8,8 +8,6 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
-	"github.com/atotto/clipboard"
-	"github.com/urfave/cli"
 	"io"
 	"os"
 	"os/signal"
@@ -19,19 +17,22 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"github.com/atotto/clipboard"
+	"github.com/urfave/cli"
 )
 
 const (
-	version = "0.2.1"
+	version    = "0.2.1"
 	maxNameLen = 25
 )
 
 var (
-	errr = errors.New("Error")
+	errr        = errors.New("Error")
 	forceChange bool
-	digits7 bool
-	digits8 bool
-	interrupt = make(chan os.Signal)
+	digits7     bool
+	digits8     bool
+	interrupt   = make(chan os.Signal)
 )
 
 func cls() {
@@ -56,13 +57,13 @@ func toBytes(value int64) []byte {
 }
 
 func toUint32(bytes []byte) uint32 {
-	return (uint32(bytes[0])<<24)+(uint32(bytes[1])<<16)+(uint32(bytes[2])<<8)+
-			uint32(bytes[3])
+	return (uint32(bytes[0]) << 24) + (uint32(bytes[1]) << 16) + (uint32(bytes[2]) << 8) +
+		uint32(bytes[3])
 }
 
 func oneTimePassword(keyStr string) string {
 	byteSecret, err := base32.StdEncoding.WithPadding(base32.NoPadding).
-			DecodeString(keyStr)
+		DecodeString(keyStr)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(2)
@@ -76,7 +77,7 @@ func oneTimePassword(keyStr string) string {
 	offset := hash[len(hash)-1] & 0x0F
 
 	// Get 32-bit chunk from the hash starting at offset
-	hashParts := hash[offset:offset+4]
+	hashParts := hash[offset : offset+4]
 
 	// Ignore most significant bit 0x80 (RFC4226)
 	hashParts[0] = hashParts[0] & 0x7F
@@ -111,7 +112,7 @@ func addEntry(name, secret string) {
 	action := "Added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Entry "+name+" already exists, sure to change? [y/N] ")
+			fmt.Printf("Entry " + name + " already exists, sure to change? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
@@ -160,7 +161,7 @@ func deleteEntry(name string) {
 	exitOnError(err, "Open database to delete entry failed")
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Sure to delete entry "+name+"? [y/N] ")
+			fmt.Printf("Sure to delete entry " + name + "? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
@@ -171,7 +172,7 @@ func deleteEntry(name string) {
 		delete(db.Entries, name)
 		err = saveDb(&db)
 		exitOnError(err, "Failed to delete entry")
-		fmt.Println("Entry "+name+" deleted")
+		fmt.Println("Entry " + name + " deleted")
 	} else {
 		fmt.Printf("Entry %s not found\n", name)
 	}
@@ -220,7 +221,7 @@ func clipCode(name string) {
 	code := oneTimePassword(db.Entries[name].Secret)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
-	left := 30-time.Now().Unix()%30
+	left := 30 - time.Now().Unix()%30
 	fmt.Printf("%s code copied, valididity: %ds\n", name, left)
 }
 
@@ -252,7 +253,7 @@ func showCodes(regex string) {
 		cls()
 		os.Exit(4)
 	}()
-	fmtstr := " %8s  %-"+strconv.Itoa(maxNameLen)+"s"
+	fmtstr := " %8s  %-" + strconv.Itoa(maxNameLen) + "s"
 	for true {
 		cls()
 		first := true
@@ -271,7 +272,7 @@ func showCodes(regex string) {
 		if !first {
 			fmt.Println()
 		}
-		left := 30-time.Now().Unix()%30
+		left := 30 - time.Now().Unix()%30
 		for left > 0 {
 			fmt.Printf("\rValidity: %2ds    [Ctrl+C to exit] ", left)
 			time.Sleep(time.Second)
@@ -312,14 +313,14 @@ func importEntries(filename string) {
 		}
 		if len(name) > maxNameLen {
 			exitOnError(errr,
-					fmt.Sprintf("name longer than %d on line %d", maxNameLen, n))
+				fmt.Sprintf("name longer than %d on line %d", maxNameLen, n))
 		}
 		if _, found := db.Entries[name]; found && !forceChange {
 			exitOnError(errr, "entry "+name+" on line "+ns+
-					" already exists, use -f to force")
+				" already exists, use -f to force")
 		}
 		if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
-				DecodeString(strings.ToUpper(secret)); err != nil {
+			DecodeString(strings.ToUpper(secret)); err != nil {
 			exitOnError(err, "invalid base32 encoding on line "+ns)
 		}
 		if digits < 6 || digits > 8 {
@@ -339,8 +340,8 @@ func main() {
 	app := cli.NewApp()
 	app.Name = self
 	app.Usage = "Two Factor Authentication Tool"
-	app.Description = "Manage a 2FA database from the commandline\n"+
-		"   Database: "+dbPath
+	app.Description = "Manage a 2FA database from the commandline\n" +
+		"   Database: " + dbPath
 	app.Version = version
 	app.Author = "github.com/pepa65/twofat"
 	app.Email = "pepa65@passchier.net"
@@ -359,10 +360,10 @@ func main() {
 
 	app.Commands = []cli.Command{
 		{
-			Name: "show",
-			Aliases: []string{"view", "list", "ls"},
-			UsageText: self+" [show|view|list|ls [REGEX]",
-			Usage: "Show codes for all entries [that match REGEX]",
+			Name:      "show",
+			Aliases:   []string{"view", "list", "ls"},
+			UsageText: self + " [show|view|list|ls] [REGEX]",
+			Usage:     "Show codes for all entries [that match REGEX]",
 			Action: func(c *cli.Context) error {
 				regex := ""
 				if len(c.Args()) > 1 {
@@ -375,10 +376,10 @@ func main() {
 				return nil
 			},
 		}, {
-			Name: "add",
-			Aliases: []string{"insert", "entry"},
-			UsageText: self+" add|insert|entry [-7|-8] [-f|--force] NAME [SECRET]",
-			Usage: "Add a new entry NAME with SECRET",
+			Name:      "add",
+			Aliases:   []string{"insert", "entry"},
+			UsageText: self + " add|insert|entry [-7|-8] [-f|--force] NAME [SECRET]",
+			Usage:     "Add a new entry NAME with SECRET",
 			Action: func(c *cli.Context) error {
 				secret := ""
 				if len(c.Args()) < 1 {
@@ -395,26 +396,26 @@ func main() {
 			},
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name: "f, force",
-					Usage: "Force modification of existing entry",
+					Name:        "f, force",
+					Usage:       "Force modification of existing entry",
 					Destination: &forceChange,
 				},
 				cli.BoolFlag{
-					Name: "7",
-					Usage: "Code of length 7 instead of 6",
+					Name:        "7",
+					Usage:       "Code of length 7 instead of 6",
 					Destination: &digits7,
 				},
 				cli.BoolFlag{
-					Name: "8",
-					Usage: "Code of length 8 instead of 6",
+					Name:        "8",
+					Usage:       "Code of length 8 instead of 6",
 					Destination: &digits8,
 				},
 			},
 		}, {
-			Name: "secret",
-			Aliases: []string{"reveal"},
-			UsageText: self+" secret|reveal NAME",
-			Usage: "Show secret of entry NAME",
+			Name:      "secret",
+			Aliases:   []string{"reveal"},
+			UsageText: self + " secret|reveal NAME",
+			Usage:     "Show secret of entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
 					return fmt.Errorf("Need 1 argument: NAME\n")
@@ -423,10 +424,10 @@ func main() {
 				return nil
 			},
 		}, {
-			Name: "clip",
-			Aliases: []string{"copy", "cp"},
-			UsageText: self+" clip|copy|cp NAME",
-			Usage: "Put code of entry NAME onto the clipboard",
+			Name:      "clip",
+			Aliases:   []string{"copy", "cp"},
+			UsageText: self + " clip|copy|cp NAME",
+			Usage:     "Put code of entry NAME onto the clipboard",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
 					return fmt.Errorf("Need 1 argument: NAME\n")
@@ -435,10 +436,10 @@ func main() {
 				return nil
 			},
 		}, {
-			Name: "delete",
-			Aliases: []string{"remove", "rm"},
-			UsageText: self+" delete|remove|rm [-f|--force] NAME",
-			Usage: "Delete entry NAME",
+			Name:      "delete",
+			Aliases:   []string{"remove", "rm"},
+			UsageText: self + " delete|remove|rm [-f|--force] NAME",
+			Usage:     "Delete entry NAME",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
 					return fmt.Errorf("Need 1 argument: NAME\n")
@@ -448,16 +449,16 @@ func main() {
 			},
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name: "f, force",
-					Usage: "Force deletion, don't ask for confirmation",
+					Name:        "f, force",
+					Usage:       "Force deletion, don't ask for confirmation",
 					Destination: &forceChange,
 				},
 			},
 		}, {
-			Name: "password",
-			Aliases: []string{"passwd", "pw"},
-			UsageText: self+" password|pw",
-			Usage: "Change password",
+			Name:      "password",
+			Aliases:   []string{"passwd", "pw"},
+			UsageText: self + " password|pw",
+			Usage:     "Change password",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 0 {
 					return fmt.Errorf("No arguments allowed\n")
@@ -466,10 +467,10 @@ func main() {
 				return nil
 			},
 		}, {
-			Name: "import",
-			Aliases: []string{"csv"},
-			UsageText: self+" import|csv [-f|--force] CSVFILE",
-			Usage: "Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE",
+			Name:      "import",
+			Aliases:   []string{"csv"},
+			UsageText: self + " import|csv [-f|--force] CSVFILE",
+			Usage:     "Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE",
 			Action: func(c *cli.Context) error {
 				if len(c.Args()) != 1 {
 					return fmt.Errorf("Need 1 argument: CSVFILE\n")
@@ -479,19 +480,19 @@ func main() {
 			},
 			Flags: []cli.Flag{
 				cli.BoolFlag{
-					Name: "f, force",
-					Usage: "Force modification of any existing entries",
+					Name:        "f, force",
+					Usage:       "Force modification of any existing entries",
 					Destination: &forceChange,
 				},
 			},
 		},
 	}
 	cli.HelpFlag = cli.BoolFlag{
-		Name: "help, h",
+		Name:  "help, h",
 		Usage: "Show this help, or use after a command for command help",
 	}
 	cli.VersionFlag = cli.BoolFlag{
-		Name: "version, V, v",
+		Name:  "version, V, v",
 		Usage: "Print version",
 	}
 	err := app.Run(os.Args)
