@@ -13,7 +13,6 @@ import (
 	"os/signal"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,7 +21,7 @@ import (
 )
 
 const (
-	version    = "0.3.0"
+	version    = "0.3.1"
 	maxNameLen = 25
 )
 
@@ -56,8 +55,8 @@ func toBytes(value int64) []byte {
 }
 
 func toUint32(bytes []byte) uint32 {
-	return (uint32(bytes[0]) << 24) + (uint32(bytes[1]) << 16) + (uint32(bytes[2]) << 8) +
-		uint32(bytes[3])
+	return (uint32(bytes[0]) << 24) + (uint32(bytes[1]) << 16) +
+		(uint32(bytes[2]) << 8) + uint32(bytes[3])
 }
 
 func oneTimePassword(keyStr string) string {
@@ -88,48 +87,47 @@ func checkBase32(secret string) string {
 	secret = strings.ToUpper(secret)
 	secret = strings.ReplaceAll(secret, "-", "")
 	secret = strings.ReplaceAll(secret, " ", "")
-	if len(secret) == 0 {
+	if secret == "" {
 		return ""
 	}
 	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 	if e != nil {
-		fmt.Println("Invalid base32 (Only characters 2-7 and A-Z; spaces and dashes are ignored.)")
+		fmt.Println("Invalid base32 (Only characters 2-7 and A-Z, spaces and " +
+			"dashes are ignored.)")
 		return ""
 	}
 	return secret
 }
 
 func addEntry(name, secret string) {
-	if len(name) == 0 {
-		exitOnError(errr, "zero length Name")
-	}
 	if len([]rune(name)) > maxNameLen {
-		exitOnError(errr, fmt.Sprintf("Name longer than %d", maxNameLen))
+		exitOnError(errr, "Name longer than " + fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
-	exitOnError(err, "Open database to manage entry failed")
-	action := "Added"
+	exitOnError(err, "Failure opening database for adding entry")
+	action := "added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("entry with Name '" + name + "' already exists, sure to change? [y/N] ")
+			fmt.Printf("Entry '" + name + "' exists, confirm change [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
-				fmt.Println("entry not changed")
+				fmt.Println("Entry not changed")
 				return
 			}
 		}
+		action = "changed"
 	}
 
 	secret = checkBase32(secret)
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
-	for len(secret) == 0 || err != nil {
+	for secret == "" || err != nil {
 		fmt.Println("Enter base32 Secret [empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
 		secret = checkBase32(secret)
-		if len(secret) == 0 {
+		if secret == "" {
 			fmt.Println("Operation cancelled")
 			return
 		}
@@ -147,49 +145,50 @@ func addEntry(name, secret string) {
 		Digits: digits,
 	}
 	cls()
-	saveDb(&db)
-	fmt.Printf("%s %s\n", action, name)
-	return
+	err = saveDb(&db)
+	exitOnError(err, "Failure saving database, entry not "+action)
+	fmt.Printf("Entry '%s' %s\n", name, action)
 }
 
 func deleteEntry(name string) {
 	db, err := readDb()
-	exitOnError(err, "Open database to delete entry failed")
+	exitOnError(err, "Failure opening database for deleting entry")
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Sure to delete entry with Name '" + name + "'? [y/N] ")
+			fmt.Printf("Sure to delete entry '" + name + "'? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
-				fmt.Println("entry not deleted")
+				fmt.Println("Entry not deleted")
 				return
 			}
 		}
 		delete(db.Entries, name)
 		err = saveDb(&db)
-		exitOnError(err, "Failed to delete entry")
-		fmt.Println("Entry with Name '" + name + "' deleted")
+		exitOnError(err, "Failure saving database, entry not deleted")
+		fmt.Println("Entry '" + name + "' deleted")
 	} else {
-		fmt.Printf("Entry with Name '%s' not found\n", name)
+		fmt.Printf("Entry '%s' not found\n", name)
 	}
 }
 
 func changePassword() {
 	db, err := readDb()
-	exitOnError(err, "wrong password")
+	exitOnError(err, "Failure opening database for changing password")
 	fmt.Println("Changing password")
 	err = initPassword(&db)
-	exitOnError(err, "failed to change password")
-	saveDb(&db)
+	exitOnError(err, "Failure changing password")
+	err = saveDb(&db)
+	exitOnError(err, "Failure saving database, password not changed")
 	fmt.Println("Password change successful")
 }
 
 func revealSecret(name string) {
 	db, err := readDb()
-	exitOnError(err, "Open database to reveal Secret failed")
+	exitOnError(err, "Failure opening database for revealing Secret")
 	secret := db.Entries[name].Secret
-	if len(secret) == 0 {
-		fmt.Printf("Entry with Name '%s' not found\n", name)
+	if secret == "" {
+		fmt.Printf("Entry '%s' not found\n", name)
 		return
 	}
 	fmt.Printf("%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n",
@@ -207,23 +206,48 @@ func revealSecret(name string) {
 	}
 }
 
+func renameEntry(name string, nname string) {
+	if len([]rune(name)) > maxNameLen {
+		exitOnError(errr, "Name longer than " + fmt.Sprint(maxNameLen))
+	}
+	if len([]rune(nname)) > maxNameLen {
+		exitOnError(errr, "Newname longer than " + fmt.Sprint(maxNameLen))
+	}
+	db, err := readDb()
+	exitOnError(err, "Failure opening database for renaming entry")
+
+	if _, found := db.Entries[name]; found {
+		if _, found := db.Entries[nname]; found {
+			exitOnError(errr, "Entry '"+nname+"' already exists")
+		}
+	} else {
+		exitOnError(errr, "Entry '"+name+"' not found")
+	}
+	// Name exists, Newname doesn't
+	db.Entries[nname] = db.Entries[name]
+	delete(db.Entries, name)
+	err = saveDb(&db)
+	exitOnError(err, "Failure saving database, entry not renamed")
+	fmt.Printf("Entry '%s' renamed to '%s'\n", name, nname)
+}
+
 func clipCode(name string) {
 	db, err := readDb()
-	exitOnError(err, "Open database to copy Code to clipboard failed")
-	if secret := db.Entries[name].Secret; len(secret) == 0 {
-		fmt.Printf("Entry with Name '%s' not found\n", name)
+	exitOnError(err, "Failure opening database for copying Code to clipboard")
+	if secret := db.Entries[name].Secret; secret == "" {
+		fmt.Printf("Entry '%s' not found\n", name)
 		return
 	}
 	code := oneTimePassword(db.Entries[name].Secret)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
 	left := 30 - time.Now().Unix()%30
-	fmt.Printf("%s Code copied, valididity: %ds\n", name, left)
+	fmt.Printf("Code of '%s' copied to clipboard, valid for %ds\n", name, left)
 }
 
 func showCodes(regex string) {
 	db, err := readDb()
-	exitOnError(err, "Failed to read database")
+	exitOnError(err, "Failure opening database for showing Codes")
 
 	// Match regex and sort on name
 	var names []string
@@ -249,7 +273,7 @@ func showCodes(regex string) {
 		cls()
 		os.Exit(4)
 	}()
-	fmtstr := " %8s  %-" + strconv.Itoa(maxNameLen) + "s"
+	fmtstr := " %8s  %-" + fmt.Sprint(maxNameLen) + "s"
 	for true {
 		cls()
 		first := true
@@ -280,44 +304,54 @@ func showCodes(regex string) {
 
 func importEntries(filename string) {
 	csvfile, err := os.Open(filename)
-	exitOnError(err, "Could not open fatabase with filename '"+filename+"'")
+	exitOnError(err, "Could not open database file '"+filename+"'")
 	reader := csv.NewReader(bufio.NewReader(csvfile))
 	db, err := readDb()
-	exitOnError(err, "Open database to import entries failed")
+	exitOnError(err, "Failure opening database for import")
 
 	// Check data, then admit to database, but only save when no errors
-	n := 0
+	n, ns := 0, ""
 	var name, secret string
 	var digits int
 	for {
-		n++
-		ns := strconv.Itoa(n)
 		line, err := reader.Read()
 		if err == io.EOF {
 			break
 		}
-		exitOnError(err, "error reading CSV data on line "+ns)
+		n++
+		ns = fmt.Sprint(n)
+		exitOnError(err, "Error reading CSV data on line "+ns)
 		if len(line) != 3 {
-			exitOnError(errr, "line "+ns+" doesn't have 3 fields")
+			exitOnError(errr, "Line "+ns+" doesn't have 3 fields")
 		}
 		name = line[0]
 		secret = line[1]
-		digits, err = strconv.Atoi(line[2])
-		exitOnError(err, "not an integer in Codelength (field 3) on line "+ns+": "+line[2])
-		if len(name) == 0 || len(secret) == 0 {
+		switch line[2] {
+		case "6": digits = 6
+		case "7": digits = 7
+		case "8": digits = 8
+		default:
+			exitOnError(err, "Codelength (field 3) on line " + ns + "not 6/7/8: " +
+				line[2])
+		}
+		if name == "" {
 			exitOnError(errr, "Name (field 1) empty on line "+ns)
+		}
+		if secret == "" {
+			exitOnError(errr, "Secret (field 2) empty on line "+ns)
 		}
 		if len(name) > maxNameLen {
 			exitOnError(errr,
 				fmt.Sprintf("Name (field 1) longer than %d on line %d", maxNameLen, n))
 		}
 		if _, found := db.Entries[name]; found && !forceChange {
-			exitOnError(errr, "entry with Name '"+name+"' on line "+ns+
-				" already exists, force with -f/--force")
+			exitOnError(errr, "Entry '"+name+"' on line "+ns+
+				" exists, force overwrite with -f/--force")
 		}
 		if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
 			DecodeString(strings.ToUpper(secret)); err != nil {
-			exitOnError(err, "invalid base32 encoding in Secret (field 2) on line "+ns)
+			exitOnError(err, "Invalid base32 encoding in Secret (field 2) on line " +
+				ns)
 		}
 		if digits < 6 || digits > 8 {
 			exitOnError(errr, "Codelength (field 3) not 6, 7 or 8 on line "+ns)
@@ -327,13 +361,14 @@ func importEntries(filename string) {
 			Digits: digits,
 		}
 	}
-	saveDb(&db)
+	err = saveDb(&db)
+	exitOnError(err, "Failure saving database, entries not imported")
 	fmt.Printf("All %d entries in '%s' successfully imported\n", n, filename)
 	return
 }
 
 func main() {
-	self, cmd, regex, name, secret, csvfile := "", "", "", "", "", ""
+	self, cmd, regex, name, nname, secret, csvfile := "", "", "", "", "", "", ""
 	for _, arg := range os.Args {
 		if self == "" { // Get binary name (arg0)
 			selves := strings.Split(arg, "/")
@@ -347,6 +382,8 @@ func main() {
 			case "version", "v", "--version", "-V":
 				fmt.Println(self + " version " + version)
 				return
+			case "rename", "move", "mv":
+				cmd = "m" // NAME NEWNAME
 			case "add", "insert", "entry":
 				cmd = "a" // NAME SECRET -7 -8 -f/--force
 			case "reveal", "secret":
@@ -367,12 +404,12 @@ func main() {
 			continue
 		}
 		// Arguments arg0 (self) and arg1 (cmd/REGEX) are parsed
-		switch cmd { // Parse arg based on cmd
+		switch cmd { // Parse rest of args based on cmd
 		case "p":
-			usage("password command takes no argument: " + arg)
+			usage("password command takes no argument")
 		case "s":
 			if regex != "" {
-				usage("more than 1 regular expression: " + arg)
+				usage("too many arguments, Regular expression already given")
 			}
 			regex = arg
 		case "i":
@@ -381,7 +418,7 @@ func main() {
 				continue
 			}
 			if csvfile != "" {
-				usage("more than 1 CSV filename: " + arg)
+				usage("too many arguments, CSV filename already given")
 			}
 			csvfile = arg
 		case "d":
@@ -390,14 +427,23 @@ func main() {
 				continue
 			}
 			if name != "" {
-				usage("more than 1 entry name: " + arg)
+				usage("too many arguments, Name already given")
 			}
 			name = arg
 		case "c", "r":
 			if name != "" {
-				usage("more than 1 entry name: " + arg)
+				usage("too many arguments, Name already given")
 			}
 			name = arg
+		case "m":
+			if name != "" {
+				if nname != "" {
+					usage("too many arguments, Name and Newname already given")
+				}
+				nname = arg
+			} else {
+				name = arg
+			}
 		case "a":
 			if arg == "-f" || arg == "--force" {
 				forceChange = true
@@ -413,7 +459,7 @@ func main() {
 			}
 			if name != "" {
 				if secret != "" {
-					usage("too many arguments, Name and Secret already given: " + arg)
+					usage("too many arguments, Name and Secret already given")
 				}
 				secret = arg
 			} else {
@@ -421,50 +467,77 @@ func main() {
 			}
 		}
 	}
-	// All arguments have been parsed
-	if digits7 && digits8 {
-		usage("can't have both 7 and 8 length Code for the same entry")
-	}
+	// All arguments have been parsed, check
 	switch cmd {
-	case "", "s": showCodes(regex)
-	case "a": addEntry(name, secret)
-	case "r": revealSecret(name)
-	case "c": clipCode(name)
-	case "d": deleteEntry(name)
-	case "p": changePassword()
-	case "i": importEntries(csvfile)
+	case "", "s":
+		showCodes(regex)
+	case "a":
+		if digits7 && digits8 {
+			usage("can't have both 7 and 8 length Code for the same entry")
+		}
+		if name == "" {
+			usage("add command needs Name as argument")
+		}
+		addEntry(name, secret)
+	case "m":
+		if name == "" || nname == "" {
+			usage("rename command needs Name and Newname as arguments")
+		}
+		renameEntry(name, nname)
+	case "r":
+		if name == "" {
+			usage("reveal command needs Name as argument")
+		}
+		revealSecret(name)
+	case "c":
+		if name == "" {
+			usage("clip command needs Name as argument")
+		}
+		clipCode(name)
+	case "d":
+		if name == "" {
+			usage("delete command needs Name as argument")
+		}
+		deleteEntry(name)
+	case "p":
+		changePassword()
+	case "i":
+		if csvfile == "" {
+			usage("import command needs CSV filename as argument")
+		}
+		importEntries(csvfile)
 	}
 }
 
 func usage(err string) {
-	help := self + " version " + version + " - Two Factor Authentication Tool" +
-		"\n* Purpose:   Manage a 2FA database from the commandline" +
-		"\n* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>" +
-		"\n* Database:  " + dbPath + `
+	help := self + " version " + version +
+		" - Manage a 2FA database from the commandline\n" +
+		"* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>\n" +
+		"* Database:  " + dbPath + `
 * Usage:     twofat [COMMAND]
-  COMMAND:
-      [ show | view | list | ls | totp ]  [REGEX]
-          Show all Codes (with Names matching REGEX).
-      add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
-          Add a new entry NAME with SECRET (queried when not given).
-          When -7/-8 are not given, Code length is 6.
-          If -f/--force is given, no confirmation is asked when NAME exists.
-      delete | remove | rm  NAME  [-f|--force]
-          Delete entry NAME. If -f/--force is given, no confirmation is asked.
-      import | csv  CSVFILE  [-f|--force]
-          Import lines with "NAME,SECRET,CODELENGTH" from CSVFILE.
-          If -f/--force is given, existing entries with NAME are overwritten.
-      reveal | secret  NAME          Show Secret of entry NAME.
-      clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
-      password | passwd | pw         Change database encryption password.
-      version | v | --version | -V   Show version.
-      help | h | --help | -h         Show this help text.`
+    [ show | view | list | ls | totp ]  [REGEX]
+        Show all Codes (with Names matching REGEX).
+    add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+        Add a new entry NAME with SECRET (queried when not given).
+        When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+        If -f/--force is given, no confirmation is asked when NAME exists.
+    delete | remove | rm  NAME  [-f|--force]
+        Delete entry NAME. If -f/--force is given, no confirmation is asked.
+    rename | move | mv  NAME  NEWNAME
+        Rename entry from NAME to NEWNAME.
+    import | csv  CSVFILE  [-f|--force]
+        Import lines with "NAME,SECRET,CODELENGTH" from CSVFILE.
+        If -f/--force is given, existing entries NAME are overwritten.
+    reveal | secret  NAME          Show Secret of entry NAME.
+    clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
+    password | passwd | pw         Change database encryption password.
+    version | v | --version | -V   Show version.
+    help | h | --help | -h         Show this help text.`
 
   fmt.Println(help)
   if err != "" {
-    fmt.Println("Abort: " + err)
+    fmt.Println("Abort, " + err)
     os.Exit(1)
-  } else {
-    os.Exit(0)
   }
+  os.Exit(0)
 }
