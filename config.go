@@ -72,7 +72,7 @@ func readDb() (dbase, error) {
 
 		nonce := dbdata[:nonceSize]
 		encdata := dbdata[nonceSize:]
-		fmt.Printf("Enter password: ")
+		fmt.Printf("Enter database password: ")
 		db.Pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		key := deriveKey(db.Pwd, nonce, aesKeySize)
@@ -111,7 +111,7 @@ func saveDb(db *dbase) error {
 	nonce := make([]byte, nonceSize)
 	_, err := io.ReadFull(rand.Reader, nonce)
 	if err != nil {
-		return errors.New("Could not get randomized data")
+		return errors.New("could not get randomized data")
 	}
 	buf.Write(nonce)
 	key := deriveKey(db.Pwd, nonce, aesKeySize)
@@ -140,12 +140,12 @@ func saveDb(db *dbase) error {
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
 	for retryTimes > 0 {
-		fmt.Printf("New password: ")
+		fmt.Printf("New database password: ")
 		pwd, _ := terminal.ReadPassword(int(syscall.Stdin))
 		if len(pwd) == 0 {
 			fmt.Printf("\nPassword can't be empty")
 		} else {
-			fmt.Printf("\nConfirm password: ")
+			fmt.Printf("\nConfirm database password: ")
 			pwdc, _ := terminal.ReadPassword(int(syscall.Stdin))
 			fmt.Println()
 			if bytes.Equal(pwd, pwdc) {

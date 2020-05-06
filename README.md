@@ -1,7 +1,7 @@
 # twofat
 ## Two Factor Authentication Tool
 ### Manage a 2FA database from the commandline
-* **v0.2.1**
+* **v0.3.0**
 * Repo [gitlab.com/pepa/twofat](https://github.com/pepa65/twofat)
 * After [github.com/slandx/tfat](https://github.com/slandx/tfat)
 
@@ -22,34 +22,27 @@ go get -u github.com/pepa65/twofat
 ```
 
 ## Usage
-`twofat help`:
 ```
-NAME:
-   twofat - Two Factor Authentication Tool
-
-USAGE:
-   twofat [global options] command [command options] [arguments...]
-
-VERSION:
-   0.2.1
-
-DESCRIPTION:
-   Manage a 2FA database from the commandline
-
-AUTHOR:
-   github.com/pepa65/twofat <pepa65@passchier.net>
-
-COMMANDS:
-   show, view, list, ls  Show codes for all entries [that match REGEX]
-   add, insert, entry    Add a new entry NAME with SECRET
-   secret, reveal        Show secret of entry NAME
-   clip, copy, cp        Put code of entry NAME onto the clipboard
-   delete, remove, rm    Delete entry NAME
-   password, passwd, pw  Change password
-   import, csv           Import entries 'NAME,SECRET,CODELENGTH' from CSVFILE
-   help, h               Shows a list of commands or help for one command
-
-GLOBAL OPTIONS:
-   --help, -h         Show this help, or use after a command for command help
-   --version, -V, -v  Print version
+twofat version 0.3.0 - Two Factor Authentication Tool
+* Purpose:   Manage a 2FA database from the commandline
+* Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
+* Database:  /home/pp/.twofat.enc
+* Usage:      twofat [COMMAND]
+  COMMAND:
+      [ show | view | list | ls | totp ]  [REGEX]
+          Show all Codes (with Names matching REGEX).
+      add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+          Add a new entry NAME with SECRET (queried when not given).
+          When -7/-8 are not given, Code length is 6.
+          If -f/--force is given, no confirmation is asked when NAME exists.
+      delete | remove | rm  NAME  [-f|--force]
+          Delete entry NAME. If -f/--force is given, no confirmation is asked.
+      import | csv  CSVFILE  [-f|--force]
+          Import lines with "NAME,SECRET,CODELENGTH" from CSVFILE.
+          If -f/--force is given, existing entries with NAME are overwritten.
+      reveal | secret  NAME          Show Secret of entry NAME.
+      clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
+      password | passwd | pw         Change database encryption password.
+      version | v | --version | -V   Show version.
+      help | h | --help | -h         Show this help text.
 ```
