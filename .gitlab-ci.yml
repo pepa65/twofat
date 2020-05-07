@@ -1,0 +1,8 @@
+image: "go:1.13"
+
+build:
+  script:
+    - GOOS=linux GOARCH=amd64 go build -ldflags="-s -w"
+    - GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
+    - GOOS=freebsd GOARCH=amd54 go build -ldflags="-s -w" -o twofat_bsd
+    - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
