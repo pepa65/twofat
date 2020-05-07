@@ -31,6 +31,8 @@ var (
 	digits7     = false
 	digits8     = false
 	interrupt   = make(chan os.Signal)
+	hl          = "\033[7m"
+	ul          = "\033[27m"
 )
 
 func cls() {
@@ -276,6 +278,11 @@ func showCodes(regex string) {
 	fmtstr := " %8s  %-" + fmt.Sprint(maxNameLen) + "s"
 	for true {
 		cls()
+		fmt.Printf("    "+hl+"Code"+ul+"    "+hl+"Name"+ul+"      ")
+		if len(names) > 1 {
+			fmt.Printf("                      "+hl+"Code"+ul+"    "+hl+"Name"+ul)
+		}
+		fmt.Println()
 		first := true
 		for _, name := range names {
 			code := oneTimePassword(db.Entries[name].Secret)
