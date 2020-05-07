@@ -1,9 +1,9 @@
 # twofat
-## Two Factor Authentication Tool
-### Manage a 2FA database from the commandline
-* **v0.3.1**
-* Repo [gitlab.com/pepa/twofat](https://github.com/pepa65/twofat)
-* After [github.com/slandx/tfat](https://github.com/slandx/tfat)
+## Manage a 2FA database from the commandline
+* **v0.3.2**
+* Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
+* After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
++ Contact: pepa65 <pepa65@passchier.net>
 
 ## Features
 * Data saved with AES-GCM encrypt in ~/.<binaryname>.enc, password changable.
@@ -22,7 +22,7 @@ go get -u github.com/pepa65/twofat
 
 ## Usage
 ```
-twofat version 0.3.1 - Manage a 2FA database from the commandline
+twofat version 0.3.2 - Manage a 2FA database from the commandline
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
 * Database:  /home/pp/.twofat.enc
 * Usage:      twofat [COMMAND]
