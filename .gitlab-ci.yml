@@ -1,8 +1,13 @@
-image: "golang:1.13"
+image: golang:latest
 
-build:
+stages:
+  - build
+
+building:
+  stage: build
   script:
+    - go get -u github.com/pepa65/twofat
     - GOOS=linux GOARCH=amd64 go build -ldflags="-s -w"
     - GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
-    - GOOS=freebsd GOARCH=amd54 go build -ldflags="-s -w" -o twofat_bsd
+    - GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o twofat_bsd
     - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
