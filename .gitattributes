@@ -1,0 +1,3 @@
+.git* export-ignore
+*.go export-ignore
+go.mod export-ignore
