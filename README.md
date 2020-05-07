@@ -18,6 +18,14 @@ go build
 
 # Or anywhere:
 go get -u github.com/pepa65/twofat
+
+# Smaller binary:
+go build -ldflags="-s -w"
+
+# Other architectures:
+GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_arm
+GOOS=freebsd GOARCH=amd54 go build -ldflags="-s -w" -o twofat_freebsd
+GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
 ```
 
 ## Usage
