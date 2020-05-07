@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	version    = "0.3.1"
+	version    = "0.3.2"
 	maxNameLen = 25
 )
 
@@ -124,15 +124,19 @@ func addEntry(name, secret string) {
 	secret = checkBase32(secret)
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
-	for secret == "" || err != nil {
-		fmt.Println("Enter base32 Secret [empty field to cancel]: ")
+	for secret == "" {
+		fmt.Printf("Enter base32 Secret [empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
-		secret = checkBase32(secret)
 		if secret == "" {
-			fmt.Println("Operation cancelled")
-			return
+			break
 		}
+		secret = checkBase32(secret)
+	}
+	if secret == "" {
+		cls()
+		fmt.Println("Adding entry cancelled")
+		return
 	}
 
 	digits := 6
