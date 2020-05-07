@@ -29,11 +29,12 @@ upx --brute twofat
 GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
 GOOS=freebsd GOARCH=amd54 go build -ldflags="-s -w" -o twofat_bsd
 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
+GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat_win
 ```
 
 ## Usage
 ```
-twofat version 0.3.2 - Manage a 2FA database from the commandline
+twofat version 0.3.3 - Manage a 2FA database from the commandline
 * Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
 * Database:  ~/.twofat.enc
 * Usage:     twofat [COMMAND]
