@@ -1,4 +1,5 @@
 .git* export-ignore
 *.go export-ignore
 go.mod export-ignore
+go.sum export-ignore
 twofat* binary
