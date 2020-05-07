@@ -3,7 +3,7 @@
 * **v0.3.2**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
-+ Contact: pepa65 <pepa65@passchier.net>
+* Contact: pepa65 <pepa65@passchier.net>
 
 ## Features
 * Data saved with AES-GCM encrypt in ~/.<binaryname>.enc, password changable.
