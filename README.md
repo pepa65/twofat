@@ -1,6 +1,6 @@
 # twofat
 ## Manage a 2FA database from the commandline
-* **v0.3.2**
+* **v0.3.3**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
@@ -27,9 +27,9 @@ upx --brute twofat
 
 # Build for other architectures:
 GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
-GOOS=freebsd GOARCH=amd54 go build -ldflags="-s -w" -o twofat_bsd
+GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o twofat_bsd
 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat_win
+GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 ```
 
 ## Usage
