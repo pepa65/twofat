@@ -22,18 +22,21 @@ go get -u github.com/pepa65/twofat
 # Smaller binary:
 go build -ldflags="-s -w"
 
-# Other architectures:
-GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_arm
-GOOS=freebsd GOARCH=amd54 go build -ldflags="-s -w" -o twofat_freebsd
+# More extreme shrinking:
+upx --brute twofat
+
+# Build for other architectures:
+GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
+GOOS=freebsd GOARCH=amd54 go build -ldflags="-s -w" -o twofat_bsd
 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
 ```
 
 ## Usage
 ```
 twofat version 0.3.2 - Manage a 2FA database from the commandline
-* Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
-* Database:  /home/pp/.twofat.enc
-* Usage:      twofat [COMMAND]
+* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
+* Database:  ~/.twofat.enc
+* Usage:     twofat [COMMAND]
     [ show | view | list | ls | totp ]  [REGEX]
         Show all Codes (with Names matching REGEX).
     add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
