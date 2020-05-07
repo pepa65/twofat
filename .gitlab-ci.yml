@@ -2,6 +2,7 @@ image: golang:latest
 
 stages:
   - build
+  - deploy
 
 building:
   stage: build
@@ -11,3 +12,14 @@ building:
     - GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
     - GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o twofat_bsd
     - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
+
+deploying:
+  stage: deploy
+  script:
+    - echo "New release"
+  artifacts:
+    name:
+      - twofat
+      - twofat_pi
+      - twofat_bsd
+      - twofat_osx
