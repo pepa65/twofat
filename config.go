@@ -100,7 +100,7 @@ func readDb() (dbase, error) {
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println("Initializing database file"
+	fmt.Println("Initializing database file")
 	initPassword(&db)
 	db.Entries = make(map[string]entry)
 	saveDb(&db)
