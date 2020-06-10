@@ -72,6 +72,7 @@ func readDb() (dbase, error) {
 
 		nonce := dbdata[:nonceSize]
 		encdata := dbdata[nonceSize:]
+		fmt.Println("Database: " + dbPath)
 		fmt.Printf("Enter database password: ")
 		db.Pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
@@ -92,14 +93,14 @@ func readDb() (dbase, error) {
 		buf := bytes.NewBuffer(decryptedData)
 		err = gob.NewDecoder(buf).Decode(&db.Entries)
 		if err != nil {
-			return dbase{}, errors.New("invalid entry data")
+			return dbase{}, errors.New("invalid entries data")
 		}
 		return db, nil
 	}
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println("Initializing database file: " + dbPath)
+	fmt.Println("Initializing database file"
 	initPassword(&db)
 	db.Entries = make(map[string]entry)
 	saveDb(&db)
@@ -139,6 +140,7 @@ func saveDb(db *dbase) error {
 
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
+	fmt.Println("Database: " + dbPath)
 	for retryTimes > 0 {
 		fmt.Printf("New database password: ")
 		pwd, _ := terminal.ReadPassword(int(syscall.Stdin))

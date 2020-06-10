@@ -414,7 +414,7 @@ func main() {
 			}
 			continue
 		}
-		// Arguments arg0 (self) and arg1 (cmd/REGEX) are parsed
+		// Arguments arg0 (self) and arg1 (cmd/REGEX) have been parsed
 		switch cmd { // Parse rest of args based on cmd
 		case "p":
 			usage("password command takes no argument")
@@ -524,8 +524,7 @@ func usage(err string) {
 	help := self + " version " + version +
 		" - Manage a 2FA database from the commandline\n" +
 		"* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>\n" +
-		"* Database:  " + dbPath + `
-* Usage:     twofat [COMMAND]
+		"* Database:  " + dbPath + "\n* Usage:     " + self + ` [COMMAND]
     [ show | view | list | ls | totp ]  [REGEX]
         Show all Codes (with Names matching REGEX).
     add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
