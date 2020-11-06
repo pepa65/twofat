@@ -4,6 +4,7 @@
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
+* Install: `wget -qO- gobinaries.com/pepa65/twofat |sh`
 
 ## Features
 * Data saved with AES-GCM encrypt in ~/.<binaryname>.enc, password changable.
