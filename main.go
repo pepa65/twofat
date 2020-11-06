@@ -57,8 +57,8 @@ func toBytes(value int64) []byte {
 }
 
 func toUint32(bytes []byte) uint32 {
-	return (uint32(bytes[0]) << 24) + (uint32(bytes[1]) << 16) +
-		(uint32(bytes[2]) << 8) + uint32(bytes[3])
+	return (uint32(bytes[0]) << 24)+(uint32(bytes[1]) << 16)+
+		(uint32(bytes[2]) << 8)+uint32(bytes[3])
 }
 
 func oneTimePassword(keyStr string) string {
@@ -94,7 +94,7 @@ func checkBase32(secret string) string {
 	}
 	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 	if e != nil {
-		fmt.Println("Invalid base32 (Only characters 2-7 and A-Z, spaces and " +
+		fmt.Println("Invalid base32 (Only characters 2-7 and A-Z, spaces and "+
 			"dashes are ignored.)")
 		return ""
 	}
@@ -103,14 +103,14 @@ func checkBase32(secret string) string {
 
 func addEntry(name, secret string) {
 	if len([]rune(name)) > maxNameLen {
-		exitOnError(errr, "Name longer than " + fmt.Sprint(maxNameLen))
+		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
 	exitOnError(err, "Failure opening database for adding entry")
 	action := "added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Entry '" + name + "' exists, confirm change [y/N] ")
+			fmt.Printf("Entry '"+name+"' exists, confirm change [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
@@ -161,7 +161,7 @@ func deleteEntry(name string) {
 	exitOnError(err, "Failure opening database for deleting entry")
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Sure to delete entry '" + name + "'? [y/N] ")
+			fmt.Printf("Sure to delete entry '"+name+"'? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
@@ -172,7 +172,7 @@ func deleteEntry(name string) {
 		delete(db.Entries, name)
 		err = saveDb(&db)
 		exitOnError(err, "Failure saving database, entry not deleted")
-		fmt.Println("Entry '" + name + "' deleted")
+		fmt.Println("Entry '"+name+"' deleted")
 	} else {
 		fmt.Printf("Entry '%s' not found\n", name)
 	}
@@ -214,10 +214,10 @@ func revealSecret(name string) {
 
 func renameEntry(name string, nname string) {
 	if len([]rune(name)) > maxNameLen {
-		exitOnError(errr, "Name longer than " + fmt.Sprint(maxNameLen))
+		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
 	}
 	if len([]rune(nname)) > maxNameLen {
-		exitOnError(errr, "Newname longer than " + fmt.Sprint(maxNameLen))
+		exitOnError(errr, "Newname longer than "+fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
 	exitOnError(err, "Failure opening database for renaming entry")
@@ -279,7 +279,7 @@ func showCodes(regex string) {
 		cls()
 		os.Exit(4)
 	}()
-	fmtstr := " %8s  %-" + fmt.Sprint(maxNameLen) + "s"
+	fmtstr := " %8s  %-"+fmt.Sprint(maxNameLen)+"s"
 	for true {
 		cls()
 		fmt.Printf("    "+hl+"Code"+ul+"    "+hl+"Name"+ul+"      ")
@@ -342,7 +342,7 @@ func importEntries(filename string) {
 		case "7": digits = 7
 		case "8": digits = 8
 		default:
-			exitOnError(err, "Codelength (field 3) on line " + ns + "not 6/7/8: " +
+			exitOnError(err, "Codelength (field 3) on line "+ns+"not 6/7/8: "+
 				line[2])
 		}
 		if name == "" {
@@ -361,7 +361,7 @@ func importEntries(filename string) {
 		}
 		if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
 			DecodeString(strings.ToUpper(secret)); err != nil {
-			exitOnError(err, "Invalid base32 encoding in Secret (field 2) on line " +
+			exitOnError(err, "Invalid base32 encoding in Secret (field 2) on line "+
 				ns)
 		}
 		if digits < 6 || digits > 8 {
@@ -391,7 +391,7 @@ func main() {
 			case "help", "h", "--help", "-h":
 				usage("")
 			case "version", "v", "--version", "-V":
-				fmt.Println(self + " version " + version)
+				fmt.Println(self+" version "+version)
 				return
 			case "rename", "move", "mv":
 				cmd = "m" // NAME NEWNAME
@@ -521,10 +521,10 @@ func main() {
 }
 
 func usage(err string) {
-	help := self + " version " + version +
-		" - Manage a 2FA database from the commandline\n" +
-		"* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>\n" +
-		"* Database:  " + dbPath + "\n* Usage:     " + self + ` [COMMAND]
+	help := self+" version "+version+
+		" - Manage a 2FA database from the commandline\n"+
+		"* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>\n"+
+		"* Database:  "+dbPath+"\n* Usage:     "+self+` [COMMAND]
     [ show | view | list | ls | totp ]  [REGEX]
         Show all Codes (with Names matching REGEX).
     add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
@@ -544,10 +544,10 @@ func usage(err string) {
     version | v | --version | -V   Show version.
     help | h | --help | -h         Show this help text.`
 
-  fmt.Println(help)
-  if err != "" {
-    fmt.Println("Abort, " + err)
-    os.Exit(1)
-  }
-  os.Exit(0)
+	fmt.Println(help)
+	if err != "" {
+		fmt.Println("Abort, "+err)
+		os.Exit(1)
+	}
+	os.Exit(0)
 }
