@@ -7,7 +7,7 @@
 * Install: `wget -qO- gobinaries.com/pepa65/twofat |sh`
 
 ## Features
-* Data saved with AES-GCM encrypt in ~/.<binaryname>.enc, password changable.
+* Data saved with AES-GCM encrypt in ~/.twofat.enc, password changeable.
 * Display codes of names matching regex, which auto-refresh.
 * Add, rename, delete entry, reveal secret, copy code to clipboard.
 * Import entries from CSV.
