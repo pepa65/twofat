@@ -13,6 +13,7 @@ import (
 	"log"
 	"os"
 	"os/user"
+	"os/exec"
 	"path"
 	"strings"
 	"syscall"
@@ -72,6 +73,7 @@ func readDb() (dbase, error) {
 
 		nonce := dbdata[:nonceSize]
 		encdata := dbdata[nonceSize:]
+		exec.Command("reset").Run()
 		fmt.Println("Database: " + dbPath)
 		fmt.Printf("Enter database password: ")
 		db.Pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
@@ -140,6 +142,7 @@ func saveDb(db *dbase) error {
 
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
+	exec.Command("reset").Run()
 	fmt.Println("Database: " + dbPath)
 	for retryTimes > 0 {
 		fmt.Printf("New database password: ")
