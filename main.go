@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	version    = "0.3.4"
+	version    = "0.3.5"
 	maxNameLen = 25
 )
 
@@ -31,8 +31,6 @@ var (
 	digits7     = false
 	digits8     = false
 	interrupt   = make(chan os.Signal)
-	hl          = "\033[7m"
-	ul          = "\033[27m"
 )
 
 func cls() {
@@ -41,7 +39,7 @@ func cls() {
 
 func exitOnError(err error, errMsg string) {
 	if err != nil {
-		fmt.Printf("%s: %s\n", errMsg, err.Error())
+		fmt.Printf(red+"%s: "+yellow+"%s\n", errMsg, err.Error())
 		os.Exit(1)
 	}
 }
@@ -94,8 +92,7 @@ func checkBase32(secret string) string {
 	}
 	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 	if e != nil {
-		fmt.Println("Invalid base32 (Only characters 2-7 and A-Z, spaces and "+
-			"dashes are ignored.)")
+		fmt.Println(red+"Invalid base32"+def+" (Valid characters: 2-7 and A-Z; ignored: spaces and dashes)")
 		return ""
 	}
 	return secret
@@ -110,11 +107,11 @@ func addEntry(name, secret string) {
 	action := "added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Entry '"+name+"' exists, confirm change [y/N] ")
+			fmt.Printf(yellow+"Entry '"+name+"' exists, confirm change [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
-				fmt.Println("Entry not changed")
+				fmt.Println(red+"Entry not changed")
 				return
 			}
 		}
@@ -125,7 +122,7 @@ func addEntry(name, secret string) {
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
 	for secret == "" {
-		fmt.Printf("Enter base32 Secret [empty field to cancel]: ")
+		fmt.Printf(yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
 		if secret == "" {
@@ -135,7 +132,7 @@ func addEntry(name, secret string) {
 	}
 	if secret == "" {
 		cls()
-		fmt.Println("Adding entry cancelled")
+		fmt.Println(red+"Adding entry cancelled")
 		return
 	}
 
@@ -153,7 +150,7 @@ func addEntry(name, secret string) {
 	cls()
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, entry not "+action)
-	fmt.Printf("Entry '%s' %s\n", name, action)
+	fmt.Printf(green+"Entry '%s' %s\n", name, action)
 }
 
 func deleteEntry(name string) {
@@ -161,32 +158,32 @@ func deleteEntry(name string) {
 	exitOnError(err, "Failure opening database for deleting entry")
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf("Sure to delete entry '"+name+"'? [y/N] ")
+			fmt.Printf(yellow+"Sure to delete entry '"+name+"'? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadString('\n')
 			if cfm[0] != 'y' {
-				fmt.Println("Entry not deleted")
+				fmt.Println(red+"Entry not deleted")
 				return
 			}
 		}
 		delete(db.Entries, name)
 		err = saveDb(&db)
 		exitOnError(err, "Failure saving database, entry not deleted")
-		fmt.Println("Entry '"+name+"' deleted")
+		fmt.Println(green+"Entry '"+name+"' deleted")
 	} else {
-		fmt.Printf("Entry '%s' not found\n", name)
+		fmt.Printf(red+"Entry '%s' not found\n", name)
 	}
 }
 
 func changePassword() {
 	db, err := readDb()
 	exitOnError(err, "Failure opening database for changing password")
-	fmt.Println("Changing password")
+	fmt.Println(green+"Changing password")
 	err = initPassword(&db)
 	exitOnError(err, "Failure changing password")
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, password not changed")
-	fmt.Println("Password change successful")
+	fmt.Println(green+"Password change successful")
 }
 
 func revealSecret(name string) {
@@ -194,12 +191,11 @@ func revealSecret(name string) {
 	exitOnError(err, "Failure opening database for revealing Secret")
 	secret := db.Entries[name].Secret
 	if secret == "" {
-		fmt.Printf("Entry '%s' not found\n", name)
+		fmt.Printf(red+"Entry '%s' not found\n", name)
 		return
 	}
-	fmt.Printf("%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n",
-		name, secret, secret, db.Entries[name].Digits)
-	fmt.Printf("[Ctrl+C to exit] ")
+	fmt.Printf(blue+"%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n",	name, secret, secret, db.Entries[name].Digits)
+	fmt.Printf(def+"[Ctrl+C to exit] ")
 	// Handle Ctrl-C
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	go func() {
@@ -234,21 +230,22 @@ func renameEntry(name string, nname string) {
 	delete(db.Entries, name)
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, entry not renamed")
-	fmt.Printf("Entry '%s' renamed to '%s'\n", name, nname)
+	fmt.Printf(green+"Entry '%s' renamed to '%s'\n", name, nname)
 }
 
 func clipCode(name string) {
 	db, err := readDb()
 	exitOnError(err, "Failure opening database for copying Code to clipboard")
 	if secret := db.Entries[name].Secret; secret == "" {
-		fmt.Printf("Entry '%s' not found\n", name)
+		fmt.Printf(red+"Entry "+yellow+"%s"+red+" not found\n", name)
 		return
 	}
 	code := oneTimePassword(db.Entries[name].Secret)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
 	left := 30 - time.Now().Unix()%30
-	fmt.Printf("Code of '%s' copied to clipboard, valid for %ds\n", name, left)
+	fmt.Printf(green+"Code of "+blue+"%s"+green+
+		" copied to clipboard, valid for"+yellow+" %d"+green+"s\n", name, left)
 }
 
 func showCodes(regex string) {
@@ -263,7 +260,7 @@ func showCodes(regex string) {
 		}
 	}
 	if len(names) == 0 {
-		fmt.Printf("No entries")
+		fmt.Printf(red+"No entries")
 		if regex != "" {
 			fmt.Printf(" matching Regex '%s'", regex)
 		}
@@ -282,16 +279,16 @@ func showCodes(regex string) {
 	fmtstr := " %8s  %-"+fmt.Sprint(maxNameLen)+"s"
 	for true {
 		cls()
-		fmt.Printf("    "+hl+"Code"+ul+"    "+hl+"Name"+ul+"      ")
+		fmt.Printf(blue+"   Code    Name")
 		if len(names) > 1 {
-			fmt.Printf("                      "+hl+"Code"+ul+"    "+hl+"Name"+ul)
+			fmt.Printf("                          Code    Name")
 		}
-		fmt.Println()
+		fmt.Println(def)
 		first := true
 		for _, name := range names {
 			code := oneTimePassword(db.Entries[name].Secret)
 			code = code[len(code)-db.Entries[name].Digits:]
-			fmt.Printf(fmtstr, code, name)
+			fmt.Printf(fmtstr, yellow+code+def, name)
 			if first {
 				first = false
 				fmt.Printf("    ")
@@ -305,7 +302,8 @@ func showCodes(regex string) {
 		}
 		left := 30 - time.Now().Unix()%30
 		for left > 0 {
-			fmt.Printf("\rValidity: %2ds    [Ctrl+C to exit] ", left)
+			fmt.Printf(blue+"\rValidity:"+yellow+" %2d"+blue+"s    "+def+
+				"[Ctrl+C to exit] ", left)
 			time.Sleep(time.Second)
 			left--
 		}
@@ -374,7 +372,7 @@ func importEntries(filename string) {
 	}
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, entries not imported")
-	fmt.Printf("All %d entries in '%s' successfully imported\n", n, filename)
+	fmt.Printf(green+"All %d entries in '%s' successfully imported\n", n, filename)
 	return
 }
 
@@ -521,32 +519,34 @@ func main() {
 }
 
 func usage(err string) {
-	help := self+" version "+version+
+	help := blue+self+" v"+version+def+
 		" - Manage a 2FA database from the commandline\n"+
-		"* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>\n"+
-		"* Database:  "+dbPath+"\n* Usage:     "+self+` [COMMAND]
-    [ show | view | list | ls | totp ]  [REGEX]
+		"* "+blue+"Repo"+def+
+		":      "+yellow+"github.com/pepa65/twofat"+def+
+		" <pepa65@passchier.net>\n* "+blue+"Database"+def+":  "+yellow+dbPath+
+		def+"\n* "+blue+"Usage"+def+":     "+self+" [COMMAND]\n"+yellow+
+		"  COMMAND"+def+`:
+  - [ show | view | list | ls | totp ]  [REGEX]
         Show all Codes (with Names matching REGEX).
-    add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+  - add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
         Add a new entry NAME with SECRET (queried when not given).
         When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
         If -f/--force is given, no confirmation is asked when NAME exists.
-    delete | remove | rm  NAME  [-f|--force]
+  - delete | remove | rm  NAME  [-f|--force]
         Delete entry NAME. If -f/--force is given, no confirmation is asked.
-    rename | move | mv  NAME  NEWNAME
-        Rename entry from NAME to NEWNAME.
-    import | csv  CSVFILE  [-f|--force]
+  - rename | move | mv  NAME  NEWNAME       Rename entry from NAME to NEWNAME.
+  - import | csv  CSVFILE  [-f|--force]
         Import lines with "NAME,SECRET,CODELENGTH" from CSVFILE.
         If -f/--force is given, existing entries NAME are overwritten.
-    reveal | secret  NAME          Show Secret of entry NAME.
-    clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
-    password | passwd | pw         Change database encryption password.
-    version | v | --version | -V   Show version.
-    help | h | --help | -h         Show this help text.`
+  - reveal | secret  NAME          Show Secret of entry NAME.
+  - clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
+  - password | passwd | pw         Change database encryption password.
+  - version | v | --version | -V   Show version.
+  - help | h | --help | -h         Show this help text.`
 
 	fmt.Println(help)
 	if err != "" {
-		fmt.Println("Abort, "+err)
+		fmt.Println(red+"Abort: "+err)
 		os.Exit(1)
 	}
 	os.Exit(0)
