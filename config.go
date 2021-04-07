@@ -26,6 +26,11 @@ const (
 	aesKeySize uint32 = 32
 	nonceSize         = 12
 	pwRetry           = 3
+	red               = "\033[31m"
+	green             = "\033[32m"
+	yellow            = "\033[33m"
+	blue              = "\033[34m"
+	def               = "\033[39m"
 )
 
 var (
@@ -74,8 +79,8 @@ func readDb() (dbase, error) {
 		nonce := dbdata[:nonceSize]
 		encdata := dbdata[nonceSize:]
 		exec.Command("reset").Run()
-		fmt.Println("Database: " + dbPath)
-		fmt.Printf("Enter database password: ")
+		fmt.Println("Database: " + blue + dbPath)
+		fmt.Printf(yellow+"Enter database password: ")
 		db.Pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
 		key := deriveKey(db.Pwd, nonce, aesKeySize)
@@ -102,7 +107,7 @@ func readDb() (dbase, error) {
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println("Initializing database file")
+	fmt.Println(green+"Initializing database file")
 	initPassword(&db)
 	db.Entries = make(map[string]entry)
 	saveDb(&db)
@@ -143,12 +148,12 @@ func saveDb(db *dbase) error {
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
 	exec.Command("reset").Run()
-	fmt.Println("Database: " + dbPath)
+	fmt.Println("Database: " + blue + dbPath)
 	for retryTimes > 0 {
-		fmt.Printf("New database password: ")
+		fmt.Printf(yellow+"New database password: ")
 		pwd, _ := terminal.ReadPassword(int(syscall.Stdin))
 		if len(pwd) == 0 {
-			fmt.Printf("\nPassword can't be empty")
+			fmt.Printf(red+"\nPassword can't be empty")
 		} else {
 			fmt.Printf("\nConfirm database password: ")
 			pwdc, _ := terminal.ReadPassword(int(syscall.Stdin))
@@ -157,7 +162,7 @@ func initPassword(db *dbase) error {
 				db.Pwd = pwd
 				return nil
 			}
-			fmt.Printf("Passwords not the same")
+			fmt.Printf(red+"Passwords not the same")
 		}
 		retryTimes--
 		if retryTimes > 0 {
