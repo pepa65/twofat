@@ -21,7 +21,7 @@ import (
 )
 
 const (
-	version    = "0.3.5"
+	version    = "0.3.6"
 	maxNameLen = 25
 )
 
@@ -39,7 +39,7 @@ func cls() {
 
 func exitOnError(err error, errMsg string) {
 	if err != nil {
-		fmt.Printf(red+"%s: "+yellow+"%s\n", errMsg, err.Error())
+		fmt.Printf(red+"%s: "+yellow+"%s\n"+def, errMsg, err.Error())
 		os.Exit(1)
 	}
 }
@@ -109,8 +109,8 @@ func addEntry(name, secret string) {
 		if !forceChange {
 			fmt.Printf(yellow+"Entry '"+name+"' exists, confirm change [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
-			cfm, _ := reader.ReadString('\n')
-			if cfm[0] != 'y' {
+			cfm, _ := reader.ReadByte()
+			if cfm != 'y' {
 				fmt.Println(red+"Entry not changed")
 				return
 			}
@@ -160,8 +160,8 @@ func deleteEntry(name string) {
 		if !forceChange {
 			fmt.Printf(yellow+"Sure to delete entry '"+name+"'? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
-			cfm, _ := reader.ReadString('\n')
-			if cfm[0] != 'y' {
+			cfm, _ := reader.ReadByte()
+			if cfm != 'y' {
 				fmt.Println(red+"Entry not deleted")
 				return
 			}
@@ -276,19 +276,19 @@ func showCodes(regex string) {
 		cls()
 		os.Exit(4)
 	}()
-	fmtstr := " %8s  %-"+fmt.Sprint(maxNameLen)+"s"
-	for true {
+	fmtstr := " %s  %-"+fmt.Sprint(maxNameLen)+"s"
+	for {
 		cls()
-		fmt.Printf(blue+"   Code    Name")
+		fmt.Printf(blue+"    Code    Name")
 		if len(names) > 1 {
-			fmt.Printf("                          Code    Name")
+			fmt.Printf("                            Code    Name")
 		}
 		fmt.Println(def)
 		first := true
 		for _, name := range names {
 			code := oneTimePassword(db.Entries[name].Secret)
-			code = code[len(code)-db.Entries[name].Digits:]
-			fmt.Printf(fmtstr, yellow+code+def, name)
+			code = fmt.Sprintf("%8v", code[len(code)-db.Entries[name].Digits:])
+			fmt.Printf(fmtstr, green+code+def, name)
 			if first {
 				first = false
 				fmt.Printf("    ")
@@ -300,15 +300,16 @@ func showCodes(regex string) {
 		if !first {
 			fmt.Println()
 		}
-		left := 30 - time.Now().Unix()%30
+		h, m, s := time.Now().Clock()
+		left := 30-s%30
+		s = s/30*30
 		for left > 0 {
-			fmt.Printf(blue+"\rValidity:"+yellow+" %2d"+blue+"s    "+def+
-				"[Ctrl+C to exit] ", left)
+			fmt.Printf(blue+"\r %02d:%02d:%02d  Validity:"+yellow+" %2d"+
+				blue+"s  "+def+"[Ctrl+C to exit] ", h, m, s, left)
 			time.Sleep(time.Second)
 			left--
 		}
 	}
-	cls()
 }
 
 func importEntries(filename string) {
@@ -519,13 +520,13 @@ func main() {
 }
 
 func usage(err string) {
-	help := blue+self+" v"+version+def+
+	help := green+self+" v"+version+def+
 		" - Manage a 2FA database from the commandline\n"+
 		"* "+blue+"Repo"+def+
 		":      "+yellow+"github.com/pepa65/twofat"+def+
 		" <pepa65@passchier.net>\n* "+blue+"Database"+def+":  "+yellow+dbPath+
-		def+"\n* "+blue+"Usage"+def+":     "+self+" [COMMAND]\n"+yellow+
-		"  COMMAND"+def+`:
+		def+"\n* "+blue+"Usage"+def+":     "+self+" [COMMAND]\n"+
+		green+"  COMMAND"+def+`:
   - [ show | view | list | ls | totp ]  [REGEX]
         Show all Codes (with Names matching REGEX).
   - add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]

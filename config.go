@@ -26,10 +26,10 @@ const (
 	aesKeySize uint32 = 32
 	nonceSize         = 12
 	pwRetry           = 3
-	red               = "\033[31m"
-	green             = "\033[32m"
-	yellow            = "\033[33m"
-	blue              = "\033[34m"
+	red               = "\033[1m\033[31m"
+	green             = "\033[1m\033[32m"
+	yellow            = "\033[1m\033[33m"
+	blue              = "\033[1m\033[34m"
 	def               = "\033[39m"
 )
 
