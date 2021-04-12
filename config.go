@@ -16,7 +16,6 @@ import (
 	"os/exec"
 	"path"
 	"strings"
-	"syscall"
 
 	"golang.org/x/crypto/argon2"
 	"golang.org/x/crypto/ssh/terminal"
@@ -26,11 +25,12 @@ const (
 	aesKeySize uint32 = 32
 	nonceSize         = 12
 	pwRetry           = 3
+	cls               = "\033c"
 	red               = "\033[1m\033[31m"
 	green             = "\033[1m\033[32m"
 	yellow            = "\033[1m\033[33m"
 	blue              = "\033[1m\033[34m"
-	def               = "\033[39m"
+	def               = "\033[0m"
 )
 
 var (
@@ -81,7 +81,7 @@ func readDb() (dbase, error) {
 		exec.Command("reset").Run()
 		fmt.Println("Database: " + blue + dbPath)
 		fmt.Printf(yellow+"Enter database password: ")
-		db.Pwd, _ = terminal.ReadPassword(int(syscall.Stdin))
+		db.Pwd, _ = terminal.ReadPassword(0)
 		fmt.Println()
 		key := deriveKey(db.Pwd, nonce, aesKeySize)
 		block, err := aes.NewCipher(key)
@@ -151,12 +151,12 @@ func initPassword(db *dbase) error {
 	fmt.Println("Database: " + blue + dbPath)
 	for retryTimes > 0 {
 		fmt.Printf(yellow+"New database password: ")
-		pwd, _ := terminal.ReadPassword(int(syscall.Stdin))
+		pwd, _ := terminal.ReadPassword(0)
 		if len(pwd) == 0 {
 			fmt.Printf(red+"\nPassword can't be empty")
 		} else {
 			fmt.Printf("\nConfirm database password: ")
-			pwdc, _ := terminal.ReadPassword(int(syscall.Stdin))
+			pwdc, _ := terminal.ReadPassword(0)
 			fmt.Println()
 			if bytes.Equal(pwd, pwdc) {
 				db.Pwd = pwd
