@@ -10,18 +10,17 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/signal"
 	"regexp"
 	"sort"
 	"strings"
-	"syscall"
 	"time"
 
+	"golang.org/x/crypto/ssh/terminal"
 	"github.com/atotto/clipboard"
 )
 
 const (
-	version    = "0.3.6"
+	version    = "0.3.7"
 	maxNameLen = 25
 )
 
@@ -33,15 +32,18 @@ var (
 	interrupt   = make(chan os.Signal)
 )
 
-func cls() {
-	fmt.Print("\033c")
-}
-
 func exitOnError(err error, errMsg string) {
 	if err != nil {
 		fmt.Printf(red+"%s: "+yellow+"%s\n"+def, errMsg, err.Error())
 		os.Exit(1)
 	}
+}
+
+func enter(ch chan bool) {
+	terminal.ReadPassword(0)
+	ch <-true
+	fmt.Printf(cls)
+	os.Exit(0)
 }
 
 func toBytes(value int64) []byte {
@@ -131,8 +133,7 @@ func addEntry(name, secret string) {
 		secret = checkBase32(secret)
 	}
 	if secret == "" {
-		cls()
-		fmt.Println(red+"Adding entry cancelled")
+		fmt.Println(cls+red+"Adding entry cancelled")
 		return
 	}
 
@@ -147,10 +148,9 @@ func addEntry(name, secret string) {
 		Secret: strings.ToUpper(secret),
 		Digits: digits,
 	}
-	cls()
 	err = saveDb(&db)
-	exitOnError(err, "Failure saving database, entry not "+action)
-	fmt.Printf(green+"Entry '%s' %s\n", name, action)
+	exitOnError(err, cls+"Failure saving database, entry not "+action)
+	fmt.Printf(cls+green+"Entry '%s' %s\n", name, action)
 }
 
 func deleteEntry(name string) {
@@ -195,16 +195,14 @@ func revealSecret(name string) {
 		return
 	}
 	fmt.Printf(blue+"%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n",	name, secret, secret, db.Entries[name].Digits)
-	fmt.Printf(def+"[Ctrl+C to exit] ")
-	// Handle Ctrl-C
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
-	go func() {
-		<-interrupt
-		cls()
-		os.Exit(3)
-	}()
-	for true {
-		time.Sleep(time.Hour)
+	fmt.Printf(def+"[Press Enter to exit] ")
+	ch := make(chan bool)
+	go enter(ch)
+	for {
+		select {
+			case <-ch:
+			default: time.Sleep(time.Second)
+		}
 	}
 }
 
@@ -269,21 +267,15 @@ func showCodes(regex string) {
 	}
 	sort.Strings(names)
 
-	// Handle Ctrl-C
-	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
-	go func() {
-		<-interrupt
-		cls()
-		os.Exit(4)
-	}()
 	fmtstr := " %s  %-"+fmt.Sprint(maxNameLen)+"s"
+	ch := make(chan bool,1)
+	go enter(ch)
 	for {
-		cls()
-		fmt.Printf(blue+"    Code    Name")
+		fmt.Printf(cls+blue+"    Code    Name")
 		if len(names) > 1 {
 			fmt.Printf("                            Code    Name")
 		}
-		fmt.Println(def)
+		fmt.Println()
 		first := true
 		for _, name := range names {
 			code := oneTimePassword(db.Entries[name].Secret)
@@ -304,10 +296,14 @@ func showCodes(regex string) {
 		left := 30-s%30
 		s = s/30*30
 		for left > 0 {
-			fmt.Printf(blue+"\r %02d:%02d:%02d  Validity:"+yellow+" %2d"+
-				blue+"s  "+def+"[Ctrl+C to exit] ", h, m, s, left)
-			time.Sleep(time.Second)
-			left--
+			select {
+				case <-ch:
+				default:
+					fmt.Printf(blue+"\r %02d:%02d:%02d  Validity:"+yellow+" %2d"+
+						blue+"s  "+def+"[Press Enter to exit] ", h, m, s, left)
+					time.Sleep(time.Second)
+					left--
+			}
 		}
 	}
 }
@@ -548,7 +544,7 @@ func usage(err string) {
 	fmt.Println(help)
 	if err != "" {
 		fmt.Println(red+"Abort: "+err)
-		os.Exit(1)
+		os.Exit(5)
 	}
 	os.Exit(0)
 }
