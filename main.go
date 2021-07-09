@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.3.7"
+	version    = "0.3.8"
 	maxNameLen = 25
 )
 
@@ -133,7 +133,7 @@ func addEntry(name, secret string) {
 		secret = checkBase32(secret)
 	}
 	if secret == "" {
-		fmt.Println(cls+red+"Adding entry cancelled")
+		fmt.Println(cls+red+"Adding entry '"+name+"' cancelled")
 		return
 	}
 
@@ -171,7 +171,7 @@ func deleteEntry(name string) {
 		exitOnError(err, "Failure saving database, entry not deleted")
 		fmt.Println(green+"Entry '"+name+"' deleted")
 	} else {
-		fmt.Printf(red+"Entry '%s' not found\n", name)
+		fmt.Println(red+"Entry '"+name+"' not found")
 	}
 }
 
@@ -191,7 +191,7 @@ func revealSecret(name string) {
 	exitOnError(err, "Failure opening database for revealing Secret")
 	secret := db.Entries[name].Secret
 	if secret == "" {
-		fmt.Printf(red+"Entry '%s' not found\n", name)
+		fmt.Println(red+"Entry '"+name+"' not found")
 		return
 	}
 	fmt.Printf(blue+"%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n",	name, secret, secret, db.Entries[name].Digits)
@@ -208,13 +208,13 @@ func revealSecret(name string) {
 
 func renameEntry(name string, nname string) {
 	if len([]rune(name)) > maxNameLen {
-		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
+		exitOnError(errr, "NAME longer than "+fmt.Sprint(maxNameLen))
 	}
 	if len([]rune(nname)) > maxNameLen {
-		exitOnError(errr, "Newname longer than "+fmt.Sprint(maxNameLen))
+		exitOnError(errr, "NEWNAME longer than "+fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for renaming entry")
+	exitOnError(err, "Failure opening database for renaming of entry")
 
 	if _, found := db.Entries[name]; found {
 		if _, found := db.Entries[nname]; found {
@@ -228,22 +228,21 @@ func renameEntry(name string, nname string) {
 	delete(db.Entries, name)
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, entry not renamed")
-	fmt.Printf(green+"Entry '%s' renamed to '%s'\n", name, nname)
+	fmt.Println(green+"Entry '"+name+"' renamed to '"+nname+"'")
 }
 
 func clipCode(name string) {
 	db, err := readDb()
 	exitOnError(err, "Failure opening database for copying Code to clipboard")
 	if secret := db.Entries[name].Secret; secret == "" {
-		fmt.Printf(red+"Entry "+yellow+"%s"+red+" not found\n", name)
+		fmt.Println(red+"Entry '"+name+"' not found")
 		return
 	}
 	code := oneTimePassword(db.Entries[name].Secret)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
 	left := 30 - time.Now().Unix()%30
-	fmt.Printf(green+"Code of "+blue+"%s"+green+
-		" copied to clipboard, valid for"+yellow+" %d"+green+"s\n", name, left)
+	fmt.Printf(green+"Code of "+yellow+"'"+name+"'"+green+" copied to clipboard, valid for"+yellow+" %d "+green+"s\n", left)
 }
 
 func showCodes(regex string) {
@@ -258,11 +257,10 @@ func showCodes(regex string) {
 		}
 	}
 	if len(names) == 0 {
-		fmt.Printf(red+"No entries")
+		fmt.Println(red+"No entries")
 		if regex != "" {
-			fmt.Printf(" matching Regex '%s'", regex)
+			fmt.Println(" matching Regex '"+regex+"'")
 		}
-		fmt.Println()
 		return
 	}
 	sort.Strings(names)
@@ -351,8 +349,7 @@ func importEntries(filename string) {
 				fmt.Sprintf("Name (field 1) longer than %d on line %d", maxNameLen, n))
 		}
 		if _, found := db.Entries[name]; found && !forceChange {
-			exitOnError(errr, "Entry '"+name+"' on line "+ns+
-				" exists, force overwrite with -f/--force")
+			exitOnError(errr, "Entry '"+name+"' on line "+ns+" exists, force overwrite with -f/--force")
 		}
 		if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
 			DecodeString(strings.ToUpper(secret)); err != nil {
@@ -369,20 +366,22 @@ func importEntries(filename string) {
 	}
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, entries not imported")
-	fmt.Printf(green+"All %d entries in '%s' successfully imported\n", n, filename)
+	fmt.Printf(green+"All %d entries in '"+filename+"' successfully imported\n", n)
 	return
 }
 
 func main() {
-	self, cmd, regex, name, nname, secret, csvfile := "", "", "", "", "", "", ""
+	self, cmd, regex, name, nname, secret, csvfile, ddash := "", "", "", "", "", "", "", false
 	for _, arg := range os.Args {
 		if self == "" { // Get binary name (arg0)
 			selves := strings.Split(arg, "/")
 			self = selves[len(selves)-1]
 			continue
 		}
-		if cmd == "" { // Get command
-			switch arg { // First argument is command unless only regex (arg1)
+		if cmd == "" { // Determine command
+			switch arg { // First arg is command unless regex or dash-dash (arg1)
+			case "show", "view", "list", "ls", "totp", "--":
+				cmd = "s" // REGEX
 			case "help", "h", "--help", "-h":
 				usage("")
 			case "version", "v", "--version", "-V":
@@ -401,71 +400,73 @@ func main() {
 			case "password", "passwd", "pw":
 				cmd = "p" // none
 			case "import", "csv":
-				cmd = "i" // CSVFILE -f/--force
-			case "show", "view", "list", "ls", "totp":
-				cmd = "s" // REGEX
+				cmd = "i" // FILE -f/--force
 			default: // No command, must be REGEX
 				cmd, regex = "s", arg
 			}
 			continue
 		}
+		if !ddash && arg == "--" {
+			ddash = true
+			continue
+		}
 		// Arguments arg0 (self) and arg1 (cmd/REGEX) have been parsed
 		switch cmd { // Parse rest of args based on cmd
 		case "p":
-			usage("password command takes no argument")
+			usage("password command takes no ARGUMENT")
 		case "s":
 			if regex != "" {
-				usage("too many arguments, Regular expression already given")
+				usage("too many ARGUMENTs, regular expression REGEX already given")
 			}
 			regex = arg
 		case "i":
-			if arg == "-f" || arg == "--force" {
+			if !ddash && (arg == "-f" || arg == "--force") {
 				forceChange = true
 				continue
 			}
 			if csvfile != "" {
-				usage("too many arguments, CSV filename already given")
+				usage("too many ARGUMENTs, CSV-file FILE already given")
 			}
 			csvfile = arg
 		case "d":
-			if arg == "-f" || arg == "--force" {
+			if !ddash && (arg == "-f" || arg == "--force") {
 				forceChange = true
 				continue
 			}
 			if name != "" {
-				usage("too many arguments, Name already given")
+				usage("too many ARGUMENTs, NAME already given")
 			}
 			name = arg
 		case "c", "r":
 			if name != "" {
-				usage("too many arguments, Name already given")
+				usage("too many ARGUMENTs, NAME already given")
 			}
 			name = arg
 		case "m":
 			if name != "" {
 				if nname != "" {
-					usage("too many arguments, Name and Newname already given")
+					usage("too many ARGUMENTs, NAME and NEWNAME already given")
 				}
 				nname = arg
 			} else {
 				name = arg
 			}
 		case "a":
-			if arg == "-f" || arg == "--force" {
+			if !ddash && (arg == "-f" || arg == "--force") {
 				forceChange = true
 				continue
 			}
-			if arg == "-7" {
+			if !ddash && arg == "-7" {
 				digits7 = true
 				continue
 			}
-			if arg == "-8" {
+			if !ddash && arg == "-8" {
 				digits8 = true
 				continue
 			}
 			if name != "" {
 				if secret != "" {
-					usage("too many arguments, Name and Secret already given")
+					usage("too many ARGUMENTs, NAME and SECRET already given")
 				}
 				secret = arg
 			} else {
@@ -482,34 +483,34 @@ func main() {
 			usage("can't have both 7 and 8 length Code for the same entry")
 		}
 		if name == "" {
-			usage("add command needs Name as argument")
+			usage("'add' command needs NAME as ARGUMENT")
 		}
 		addEntry(name, secret)
 	case "m":
 		if name == "" || nname == "" {
-			usage("rename command needs Name and Newname as arguments")
+			usage("'rename' command needs NAME and NEWNAME as ARGUMENTs")
 		}
 		renameEntry(name, nname)
 	case "r":
 		if name == "" {
-			usage("reveal command needs Name as argument")
+			usage("'reveal' command needs NAME as ARGUMENT")
 		}
 		revealSecret(name)
 	case "c":
 		if name == "" {
-			usage("clip command needs Name as argument")
+			usage("'clip' command needs NAME as ARGUMENT")
 		}
 		clipCode(name)
 	case "d":
 		if name == "" {
-			usage("delete command needs Name as argument")
+			usage("'delete' command needs NAME as ARGUMENT")
 		}
 		deleteEntry(name)
 	case "p":
 		changePassword()
 	case "i":
 		if csvfile == "" {
-			usage("import command needs CSV filename as argument")
+			usage("'import' command needs CSV-file FILE as ARGUMENT")
 		}
 		importEntries(csvfile)
 	}
@@ -521,26 +522,25 @@ func usage(err string) {
 		"* "+blue+"Repo"+def+
 		":      "+yellow+"github.com/pepa65/twofat"+def+
 		" <pepa65@passchier.net>\n* "+blue+"Database"+def+":  "+yellow+dbPath+
-		def+"\n* "+blue+"Usage"+def+":     "+self+" [COMMAND]\n"+
-		green+"  COMMAND"+def+`:
-  - [ show | view | list | ls | totp ]  [REGEX]
-        Show all Codes (with Names matching REGEX).
-  - add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
-        Add a new entry NAME with SECRET (queried when not given).
-        When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
-        If -f/--force is given, no confirmation is asked when NAME exists.
-  - delete | remove | rm  NAME  [-f|--force]
-        Delete entry NAME. If -f/--force is given, no confirmation is asked.
-  - rename | move | mv  NAME  NEWNAME       Rename entry from NAME to NEWNAME.
-  - import | csv  CSVFILE  [-f|--force]
-        Import lines with "NAME,SECRET,CODELENGTH" from CSVFILE.
-        If -f/--force is given, existing entries NAME are overwritten.
-  - reveal | secret  NAME          Show Secret of entry NAME.
-  - clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
-  - password | passwd | pw         Change database encryption password.
-  - version | v | --version | -V   Show version.
-  - help | h | --help | -h         Show this help text.`
-
+		def+"\n* "+blue+"Usage"+def+":     "+self+" ["+green+"COMMAND"+
+		def+"] ["+green+"ARGUMENT"+def+"...]"+`
+  [ show | view | list | ls | totp ]  [REGEX]
+      Show all Codes (with Names matching REGEX).
+  add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+      Add a new entry NAME with SECRET (queried when not given).
+      When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+      If -f/--force is given, no confirmation is asked when NAME exists.
+  delete | remove | rm  NAME  [-f|--force]
+      Delete entry NAME. If -f/--force is given, no confirmation is asked.
+  rename | move | mv  NAME  NEWNAME       Rename entry from NAME to NEWNAME.
+  import | csv  FILE  [-f|--force]
+      Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
+      If -f/--force is given, existing entries NAME are overwritten.
+  reveal | secret  NAME          Show Secret of entry NAME.
+  clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
+  password | passwd | pw         Change database encryption password.
+  version | v | --version | -V   Show version.
+  help | h | --help | -h         Show this help text.`
 	fmt.Println(help)
 	if err != "" {
 		fmt.Println(red+"Abort: "+err)
