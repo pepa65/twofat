@@ -1,6 +1,6 @@
 # twofat
 ## Manage a 2FA database from the commandline
-* **v0.3.7**
+* **v0.3.8**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
@@ -36,7 +36,7 @@ GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat version 0.3.7 - Manage a 2FA database from the commandline
+twofat version 0.3.8 - Manage a 2FA database from the commandline
 * Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
 * Database:  ~/.twofat.enc
 * Usage:     twofat [COMMAND]
@@ -53,9 +53,9 @@ twofat version 0.3.7 - Manage a 2FA database from the commandline
     import | csv  CSVFILE  [-f|--force]
         Import lines with "NAME,SECRET,CODELENGTH" from CSVFILE.
         If -f/--force is given, existing entries with NAME are overwritten.
-    reveal | secret  NAME          Show Secret of entry NAME.
-    clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
-    password | passwd | pw         Change database encryption password.
-    version | v | --version | -V   Show version.
-    help | h | --help | -h         Show this help text.
+    reveal | secret  NAME           Show Secret of entry NAME.
+    clip | copy | cp  NAME          Put Code of entry NAME onto the clipboard.
+    password | passwd | pw          Change database encryption password.
+    version | v | --version | -V    Show version.
+    help | h | --help | -h          Show this help text.
 ```
