@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.3.8"
+	version    = "0.3.9"
 	maxNameLen = 25
 )
 
@@ -150,7 +150,20 @@ func addEntry(name, secret string) {
 	}
 	err = saveDb(&db)
 	exitOnError(err, cls+"Failure saving database, entry not "+action)
-	fmt.Printf(cls+green+"Entry '%s' %s\n", name, action)
+	fmt.Printf(cls+green+" Entry '"+yellow+name+green+" %s\n", action)
+	ch := make(chan bool,1)
+	go enter(ch)
+	for {
+		select {
+			case <-ch:
+			default:
+				code := oneTimePassword(db.Entries[name].Secret)
+				code = code[len(code)-db.Entries[name].Digits:]
+				left := 30 - time.Now().Unix()%30
+				fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
+				time.Sleep(time.Second)
+		}
+	}
 }
 
 func deleteEntry(name string) {
@@ -290,15 +303,12 @@ func showCodes(regex string) {
 		if !first {
 			fmt.Println()
 		}
-		h, m, s := time.Now().Clock()
-		left := 30-s%30
-		s = s/30*30
+		left := 30 - time.Now().Unix()%30
 		for left > 0 {
 			select {
 				case <-ch:
 				default:
-					fmt.Printf(blue+"\r %02d:%02d:%02d  Validity:"+yellow+" %2d"+
-						blue+"s  "+def+"[Press Enter to exit] ", h, m, s, left)
+					fmt.Printf(blue+"\r Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
 					time.Sleep(time.Second)
 					left--
 			}
