@@ -36,7 +36,7 @@ GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.4.0 - Manage a 2FA database from the commandline
+twofat v0.4.1 - Manage a 2FA database from the commandline
 * Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
 * Database:  ~/.twofat.enc
 * Usage:     twofat [COMMAND]
