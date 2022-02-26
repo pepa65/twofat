@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.3.9"
+	version    = "0.4.0"
 	maxNameLen = 25
 )
 
@@ -159,6 +159,45 @@ func addEntry(name, secret string) {
 			default:
 				code := oneTimePassword(db.Entries[name].Secret)
 				code = code[len(code)-db.Entries[name].Digits:]
+				left := 30 - time.Now().Unix()%30
+				fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
+				time.Sleep(time.Second)
+		}
+	}
+}
+
+func showTotp(secret string) {
+	secret = checkBase32(secret)
+	// If SECRET not supplied or invalid, ask for it
+	reader := bufio.NewReader(os.Stdin)
+	for secret == "" {
+		fmt.Printf(yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
+		secret, _ = reader.ReadString('\n')
+		secret = strings.TrimSuffix(secret, "\n")
+		if secret == "" {
+			break
+		}
+		secret = checkBase32(secret)
+	}
+	if secret == "" {
+		return
+	}
+
+	digits := 6
+	if digits7 {
+		digits = 7
+	}
+	if digits8 {
+		digits = 8
+	}
+	ch := make(chan bool,1)
+	go enter(ch)
+	for {
+		select {
+			case <-ch:
+			default:
+				code := oneTimePassword(strings.ToUpper(secret))
+				code = code[len(code)-digits:]
 				left := 30 - time.Now().Unix()%30
 				fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
 				time.Sleep(time.Second)
@@ -390,17 +429,19 @@ func main() {
 		}
 		if cmd == "" { // Determine command
 			switch arg { // First arg is command unless regex or dash-dash (arg1)
-			case "show", "view", "list", "ls", "totp", "--":
+			case "show", "view", "list", "ls", "--":
 				cmd = "s" // REGEX
-			case "help", "h", "--help", "-h":
+			case "help", "--help", "-h":
 				usage("")
-			case "version", "v", "--version", "-V":
+			case "version", "--version", "-V":
 				fmt.Println(self+" version "+version)
 				return
 			case "rename", "move", "mv":
 				cmd = "m" // NAME NEWNAME
 			case "add", "insert", "entry":
 				cmd = "a" // NAME SECRET -7 -8 -f/--force
+			case "totp", "temp":
+				cmd = "t" // SECRET -7 -8
 			case "reveal", "secret":
 				cmd = "r" // NAME
 			case "clip", "copy", "cp":
@@ -482,6 +523,19 @@ func main() {
 			} else {
 				name = arg
 			}
+		case "t":
+			if !ddash && arg == "-7" {
+				digits7 = true
+				continue
+			}
+			if !ddash && arg == "-8" {
+				digits8 = true
+				continue
+			}
+			if secret != "" {
+				usage("too many ARGUMENTs, SECRET already given")
+			}
+			secret = arg
 		}
 	}
 	// All arguments have been parsed, check
@@ -496,6 +550,11 @@ func main() {
 			usage("'add' command needs NAME as ARGUMENT")
 		}
 		addEntry(name, secret)
+	case "t":
+		if digits7 && digits8 {
+			usage("can't have both 7 and 8 length Code for the same entry")
+		}
+		showTotp(secret)
 	case "m":
 		if name == "" || nname == "" {
 			usage("'rename' command needs NAME and NEWNAME as ARGUMENTs")
@@ -533,13 +592,17 @@ func usage(err string) {
 		":      "+yellow+"github.com/pepa65/twofat"+def+
 		" <pepa65@passchier.net>\n* "+blue+"Database"+def+":  "+yellow+dbPath+
 		def+"\n* "+blue+"Usage"+def+":     "+self+" ["+green+"COMMAND"+
-		def+"] ["+green+"ARGUMENT"+def+"...]"+`
-  [ show | view | list | ls | totp ]  [REGEX]
-      Show all Codes (with Names matching REGEX).
+		def+"] ["+green+"ARGUMENT"+def+"...]"+green+"\nCOMMAND"+def+":"+`
+  [ show | view | list | ls ]  [REGEX]
+      Show all Codes [with Names matching REGEX] (the command is optional).
   add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
       Add a new entry NAME with SECRET (queried when not given).
       When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
       If -f/--force is given, no confirmation is asked when NAME exists.
+  totp | temp  [-7|-8]  [SECRET]
+      Show the Code for SECRET (queried when not given).
+      When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+      (The database is not queried nor written to.)
   delete | remove | rm  NAME  [-f|--force]
       Delete entry NAME. If -f/--force is given, no confirmation is asked.
   rename | move | mv  NAME  NEWNAME       Rename entry from NAME to NEWNAME.
@@ -549,8 +612,8 @@ func usage(err string) {
   reveal | secret  NAME          Show Secret of entry NAME.
   clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
   password | passwd | pw         Change database encryption password.
-  version | v | --version | -V   Show version.
-  help | h | --help | -h         Show this help text.`
+  version | --version | -V   Show version.
+  help | --help | -h         Show this help text.`
 	fmt.Println(help)
 	if err != "" {
 		fmt.Println(red+"Abort: "+err)
