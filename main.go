@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.5.0"
+	version    = "0.6.0"
 	maxNameLen = 17
 )
 
@@ -101,7 +101,7 @@ func checkBase32(secret string) string {
 }
 
 func addEntry(name, secret string) {
-	if len([]rune(name)) > maxNameLen {
+	if !forceChange && len([]rune(name)) > maxNameLen {
 		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
@@ -259,10 +259,10 @@ func revealSecret(name string) {
 }
 
 func renameEntry(name string, nname string) {
-	if len([]rune(name)) > maxNameLen {
+	if !forceChange && len([]rune(name)) > maxNameLen {
 		exitOnError(errr, "NAME longer than "+fmt.Sprint(maxNameLen))
 	}
-	if len([]rune(nname)) > maxNameLen {
+	if !forceChange && len([]rune(nname)) > maxNameLen {
 		exitOnError(errr, "NEWNAME longer than "+fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
@@ -309,10 +309,11 @@ func showCodes(regex string) {
 		}
 	}
 	if len(names) == 0 {
-		fmt.Println(red+"No entries")
+		fmt.Printf(red+"No entries")
 		if regex != "" {
 			fmt.Println(" matching Regex '"+regex+"'")
 		}
+		fmt.Println(def)
 		return
 	}
 	sort.Strings(names)
@@ -333,7 +334,11 @@ func showCodes(regex string) {
 		for _, name := range names {
 			code := oneTimePassword(db.Entries[name].Secret)
 			code = fmt.Sprintf("%8v", code[len(code)-db.Entries[name].Digits:])
-			fmt.Printf(fmtstr, green+code+def, name)
+			tag := name
+			if len(name) > maxNameLen {
+				tag = name[:maxNameLen]
+			}
+			fmt.Printf(fmtstr, green+code+def, tag)
 			n += 1
 			if n%3 == 0 {
 				fmt.Println()
@@ -354,6 +359,32 @@ func showCodes(regex string) {
 					left--
 			}
 		}
+	}
+}
+
+func showNames(regex string) {
+	db, err := readDb()
+	exitOnError(err, "Failure opening database for showing Names")
+
+	// Match regex and sort on name
+	var names []string
+	for name := range db.Entries {
+		if match, _ := regexp.MatchString(regex, name); match {
+			names = append(names, name)
+		}
+	}
+	if len(names) == 0 {
+		fmt.Printf(red+"No entries")
+		if regex != "" {
+			fmt.Printf(" matching Regex '"+regex+"'")
+		}
+		fmt.Println(def)
+		return
+	}
+
+	sort.Strings(names)
+	for _, name := range names {
+		fmt.Println(name)
 	}
 }
 
@@ -396,8 +427,11 @@ func importEntries(filename string) {
 			exitOnError(errr, "Secret (field 2) empty on line "+ns)
 		}
 		if len(name) > maxNameLen {
-			exitOnError(errr,
-				fmt.Sprintf("Name (field 1) longer than %d on line %d", maxNameLen, n))
+			if forceChange {
+				fmt.Printf(yellow + "WARNING" +def + ": Name (field 1) longer than %d on line %d\n", maxNameLen, n)
+			} else {
+				exitOnError(errr, fmt.Sprintf("Name (field 1) longer than %d on line %d", maxNameLen, n))
+			}
 		}
 		if _, found := db.Entries[name]; found && !forceChange {
 			exitOnError(errr, "Entry '"+name+"' on line "+ns+" exists, force overwrite with -f/--force")
@@ -431,8 +465,10 @@ func main() {
 		}
 		if cmd == "" { // Determine command
 			switch arg { // First arg is command unless regex or dash-dash (arg1)
-			case "show", "view", "list", "ls", "--":
+			case "show", "view", "--":
 				cmd = "s" // REGEX
+			case "list", "ls":
+				cmd = "l" // REGEX
 			case "help", "--help", "-h":
 				usage("")
 			case "version", "--version", "-V":
@@ -468,6 +504,11 @@ func main() {
 		case "p":
 			usage("password command takes no ARGUMENT")
 		case "s":
+			if regex != "" {
+				usage("too many ARGUMENTs, regular expression REGEX already given")
+			}
+			regex = arg
+		case "l":
 			if regex != "" {
 				usage("too many ARGUMENTs, regular expression REGEX already given")
 			}
@@ -544,6 +585,8 @@ func main() {
 	switch cmd {
 	case "", "s":
 		showCodes(regex)
+	case "l":
+		showNames(regex)
 	case "a":
 		if digits7 && digits8 {
 			usage("can't have both 7 and 8 length Code for the same entry")
@@ -593,29 +636,32 @@ func usage(err string) {
 		"* "+blue+"Repo"+def+
 		":      "+yellow+"github.com/pepa65/twofat"+def+
 		" <pepa65@passchier.net>\n* "+blue+"Database"+def+":  "+yellow+dbPath+
-		def+"\n* "+blue+"Usage"+def+":     "+self+" ["+green+"COMMAND"+
-		def+"] ["+green+"ARGUMENT"+def+"...]"+green+"\nCOMMAND"+def+":"+`
-  [ show | view | list | ls ]  [REGEX]
-      Show all Codes [with Names matching REGEX] (the command is optional).
-  add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
-      Add a new entry NAME with SECRET (queried when not given).
-      When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
-      If -f/--force is given, no confirmation is asked when NAME exists.
-  totp | temp  [-7|-8]  [SECRET]
-      Show the Code for SECRET (queried when not given).
-      When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
-      (The database is not queried nor written to.)
-  delete | remove | rm  NAME  [-f|--force]
-      Delete entry NAME. If -f/--force is given, no confirmation is asked.
-  rename | move | mv  NAME  NEWNAME       Rename entry from NAME to NEWNAME.
-  import | csv  FILE  [-f|--force]
-      Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
-      If -f/--force is given, existing entries NAME are overwritten.
-  reveal | secret  NAME          Show Secret of entry NAME.
-  clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
-  password | passwd | pw         Change database encryption password.
-  version | --version | -V   Show version.
-  help | --help | -h         Show this help text.`
+		def+"\n* "+blue+"Usage"+def+":     "+self+" ["+green+"COMMAND"+def+"]\n"+
+		green+"  COMMAND"+def+":"+`
+[ show | view ]  [REGEX]
+    Show all Codes [with Names matching REGEX] (the command is optional).
+list | ls  [REGEX]
+    Show all Names [with Names matching REGEX].
+add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+    Add a new entry NAME with SECRET (queried when not given).
+    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    If -f/--force: existing NAME overwritten, no NAME length check.
+totp | temp  [-7|-8]  [SECRET]
+    Show the Code for SECRET (queried when not given).
+    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    (The database is not queried nor written to.)
+delete | remove | rm  NAME  [-f|--force]
+    Delete entry NAME. If -f/--force: no confirmation asked.
+rename | move | mv  NAME  NEWNAME  [-f|--force]
+    Rename entry NAME to NEWNAME, if -f/--force: no length checks.
+import | csv  FILE  [-f|--force]
+    Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
+    If -f/--force: existing NAME overwritten, no NAME length check.
+reveal | secret  NAME       Show Secret of entry NAME.
+clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
+password | passwd | pw      Change database encryption password.
+version | --version | -V    Show version.
+help | --help | -h          Show this help text.`
 	fmt.Println(help)
 	if err != "" {
 		fmt.Println(red+"Abort: "+err)
