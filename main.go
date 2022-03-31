@@ -20,8 +20,8 @@ import (
 )
 
 const (
-	version    = "0.4.1"
-	maxNameLen = 25
+	version    = "0.5.0"
+	maxNameLen = 17
 )
 
 var (
@@ -317,29 +317,31 @@ func showCodes(regex string) {
 	}
 	sort.Strings(names)
 
-	fmtstr := " %s  %-"+fmt.Sprint(maxNameLen)+"s"
+	fmtstr := "%s %-"+fmt.Sprint(maxNameLen)+"s"
 	ch := make(chan bool,1)
 	go enter(ch)
 	for {
-		fmt.Printf(cls+blue+"    Code    Name")
+		fmt.Printf(cls+blue+"   Code   Name")
 		if len(names) > 1 {
-			fmt.Printf("                            Code    Name")
+			fmt.Printf("                Code   Name")
+		}
+		if len(names) > 2 {
+			fmt.Printf("                Code   Name")
 		}
 		fmt.Println()
-		first := true
+		n := 0
 		for _, name := range names {
 			code := oneTimePassword(db.Entries[name].Secret)
 			code = fmt.Sprintf("%8v", code[len(code)-db.Entries[name].Digits:])
 			fmt.Printf(fmtstr, green+code+def, name)
-			if first {
-				first = false
-				fmt.Printf("    ")
-			} else {
-				first = true
+			n += 1
+			if n%3 == 0 {
 				fmt.Println()
+			} else {
+				fmt.Printf(" ")
 			}
 		}
-		if !first {
+		if n%3 > 0 {
 			fmt.Println()
 		}
 		left := 30 - time.Now().Unix()%30

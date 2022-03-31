@@ -1,6 +1,6 @@
 # twofat
 ## Manage a 2FA database from the commandline
-* **v0.4.0**
+* **v0.5.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
@@ -11,6 +11,7 @@
 * Display codes of names matching regex, which auto-refresh.
 * Add, rename, delete entry, reveal secret, copy code to clipboard.
 * Import entries from CSV.
+* Displays well in 80-colums (or more) terminals. Maximum NAME length is set to 17.
 
 ## Build
 ```shell
@@ -36,7 +37,7 @@ GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.4.1 - Manage a 2FA database from the commandline
+twofat v0.5.0 - Manage a 2FA database from the commandline
 * Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
 * Database:  ~/.twofat.enc
 * Usage:     twofat [COMMAND]
