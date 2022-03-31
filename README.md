@@ -1,6 +1,6 @@
 # twofat
 ## Manage a 2FA database from the commandline
-* **v0.5.0**
+* **v0.6.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
@@ -37,30 +37,33 @@ GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.5.0 - Manage a 2FA database from the commandline
+twofat v0.6.0 - Manage a 2FA database from the commandline
 * Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
 * Database:  ~/.twofat.enc
 * Usage:     twofat [COMMAND]
-COMMAND:
-  [ show | view | list | ls ]  [REGEX]
-      Show all Codes [with Names matching REGEX] (the command is optional).
-  add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
-      Add a new entry NAME with SECRET (queried when not given).
-      When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
-      If -f/--force is given, no confirmation is asked when NAME exists.
-  totp | temp  [-7|-8]  [SECRET]
-      Show the Code for SECRET (queried when not given).
-      When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
-      (The database is not queried nor written to.)
-  delete | remove | rm  NAME  [-f|--force]
-      Delete entry NAME. If -f/--force is given, no confirmation is asked.
-  rename | move | mv  NAME  NEWNAME       Rename entry from NAME to NEWNAME.
-  import | csv  FILE  [-f|--force]
-      Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
-      If -f/--force is given, existing entries NAME are overwritten.
-  reveal | secret  NAME          Show Secret of entry NAME.
-  clip | copy | cp  NAME         Put Code of entry NAME onto the clipboard.
-  password | passwd | pw         Change database encryption password.
-  version | --version | -V   Show version.
-  help | --help | -h         Show this help text.
+  COMMAND:
+[ show | view ]  [REGEX]
+    Show all Codes [with Names matching REGEX] (the command is optional).
+list | ls  [REGEX]
+    Show all Names [with Names matching REGEX].
+add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+    Add a new entry NAME with SECRET (queried when not given).
+    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    If -f/--force: existing NAME overwritten, no NAME length check.
+totp | temp  [-7|-8]  [SECRET]
+    Show the Code for SECRET (queried when not given).
+    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    (The database is not queried nor written to.)
+delete | remove | rm  NAME  [-f|--force]
+    Delete entry NAME. If -f/--force: no confirmation asked.
+rename | move | mv  NAME  NEWNAME  [-f|--force]
+    Rename entry NAME to NEWNAME, if -f/--force: no length checks.
+import | csv  FILE  [-f|--force]
+    Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
+    If -f/--force: existing NAME overwritten, no NAME length check.
+reveal | secret  NAME       Show Secret of entry NAME.
+clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
+password | passwd | pw      Change database encryption password.
+version | --version | -V    Show version.
+help | --help | -h          Show this help text.
 ```
