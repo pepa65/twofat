@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.6.0"
+	version    = "0.6.1"
 	maxNameLen = 17
 )
 
@@ -388,6 +388,22 @@ func showNames(regex string) {
 	}
 }
 
+func exportEntries(filename string) {
+	f, err := os.OpenFile(filename, os.O_WRONLY | os.O_CREATE | os.O_EXCL, 0400)
+	if err != nil {
+		exitOnError(err, "Cannot create file or file exists")
+	}
+	db, err := readDb()
+	exitOnError(err, "Failure opening database for showing Names")
+
+	for name := range db.Entries {
+		_, err = f.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%d\"\n", name, db.Entries[name].Secret, db.Entries[name].Digits))
+		if err != nil {
+			exitOnError(err, "Error writing to " + filename)
+		}
+	}
+}
+
 func importEntries(filename string) {
 	csvfile, err := os.Open(filename)
 	exitOnError(err, "Could not open database file '"+filename+"'")
@@ -488,7 +504,9 @@ func main() {
 				cmd = "d" // NAME -f/--force
 			case "password", "passwd", "pw":
 				cmd = "p" // none
-			case "import", "csv":
+			case "export":
+				cmd = "e" // FILE
+			case "import":
 				cmd = "i" // FILE -f/--force
 			default: // No command, must be REGEX
 				cmd, regex = "s", arg
@@ -502,24 +520,29 @@ func main() {
 		// Arguments arg0 (self) and arg1 (cmd/REGEX) have been parsed
 		switch cmd { // Parse rest of args based on cmd
 		case "p":
-			usage("password command takes no ARGUMENT")
+			usage("password command takes no argument")
 		case "s":
 			if regex != "" {
-				usage("too many ARGUMENTs, regular expression REGEX already given")
+				usage("too many arguments, regular expression REGEX already given")
 			}
 			regex = arg
 		case "l":
 			if regex != "" {
-				usage("too many ARGUMENTs, regular expression REGEX already given")
+				usage("too many arguments, regular expression REGEX already given")
 			}
 			regex = arg
+		case "e":
+			if csvfile != "" {
+				usage("too many arguments, CSV-file FILE already given")
+			}
+			csvfile = arg
 		case "i":
 			if !ddash && (arg == "-f" || arg == "--force") {
 				forceChange = true
 				continue
 			}
 			if csvfile != "" {
-				usage("too many ARGUMENTs, CSV-file FILE already given")
+				usage("too many arguments, CSV-file FILE already given")
 			}
 			csvfile = arg
 		case "d":
@@ -528,18 +551,18 @@ func main() {
 				continue
 			}
 			if name != "" {
-				usage("too many ARGUMENTs, NAME already given")
+				usage("too many arguments, NAME already given")
 			}
 			name = arg
 		case "c", "r":
 			if name != "" {
-				usage("too many ARGUMENTs, NAME already given")
+				usage("too many arguments, NAME already given")
 			}
 			name = arg
 		case "m":
 			if name != "" {
 				if nname != "" {
-					usage("too many ARGUMENTs, NAME and NEWNAME already given")
+					usage("too many arguments, NAME and NEWNAME already given")
 				}
 				nname = arg
 			} else {
@@ -560,7 +583,7 @@ func main() {
 			}
 			if name != "" {
 				if secret != "" {
-					usage("too many ARGUMENTs, NAME and SECRET already given")
+					usage("too many arguments, NAME and SECRET already given")
 				}
 				secret = arg
 			} else {
@@ -576,7 +599,7 @@ func main() {
 				continue
 			}
 			if secret != "" {
-				usage("too many ARGUMENTs, SECRET already given")
+				usage("too many arguments, SECRET already given")
 			}
 			secret = arg
 		}
@@ -592,7 +615,7 @@ func main() {
 			usage("can't have both 7 and 8 length Code for the same entry")
 		}
 		if name == "" {
-			usage("'add' command needs NAME as ARGUMENT")
+			usage("'add' command needs NAME as argument")
 		}
 		addEntry(name, secret)
 	case "t":
@@ -602,29 +625,34 @@ func main() {
 		showTotp(secret)
 	case "m":
 		if name == "" || nname == "" {
-			usage("'rename' command needs NAME and NEWNAME as ARGUMENTs")
+			usage("'rename' command needs NAME and NEWNAME as arguments")
 		}
 		renameEntry(name, nname)
 	case "r":
 		if name == "" {
-			usage("'reveal' command needs NAME as ARGUMENT")
+			usage("'reveal' command needs NAME as argument")
 		}
 		revealSecret(name)
 	case "c":
 		if name == "" {
-			usage("'clip' command needs NAME as ARGUMENT")
+			usage("'clip' command needs NAME as argument")
 		}
 		clipCode(name)
 	case "d":
 		if name == "" {
-			usage("'delete' command needs NAME as ARGUMENT")
+			usage("'delete' command needs NAME as argument")
 		}
 		deleteEntry(name)
 	case "p":
 		changePassword()
+	case "e":
+		if csvfile == "" {
+			usage("'export' command needs CSV-file FILE as argument")
+		}
+		exportEntries(csvfile)
 	case "i":
 		if csvfile == "" {
-			usage("'import' command needs CSV-file FILE as ARGUMENT")
+			usage("'import' command needs CSV-file FILE as argument")
 		}
 		importEntries(csvfile)
 	}
@@ -654,9 +682,10 @@ delete | remove | rm  NAME  [-f|--force]
     Delete entry NAME. If -f/--force: no confirmation asked.
 rename | move | mv  NAME  NEWNAME  [-f|--force]
     Rename entry NAME to NEWNAME, if -f/--force: no length checks.
-import | csv  FILE  [-f|--force]
+import  FILE  [-f|--force]
     Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
     If -f/--force: existing NAME overwritten, no NAME length check.
+export  FILE                Export all entries to CSV-file FILE.
 reveal | secret  NAME       Show Secret of entry NAME.
 clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
 password | passwd | pw      Change database encryption password.
