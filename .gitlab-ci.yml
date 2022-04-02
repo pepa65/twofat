@@ -3,9 +3,6 @@ image: golang:latest
 stages:
   - build
 
-variables:
-  TAG_LATEST: https://registry.gitlab.com/pepa65/twofat/master:latest
-
 building:
   stage: build
   script:
@@ -16,9 +13,18 @@ building:
     - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
     - GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
   artifacts:
+    name: twofat
     paths:
      - twofat
+    name: twofat_pi
+    paths:
      - twofat_pi
+    name: twofat_bsd
+    paths:
      - twofat_bsd
+    name: twofat_osx
+    paths:
      - twofat_osx
+    name: twofat.exe
+    paths:
      - twofat.exe
