@@ -1,6 +1,6 @@
 # twofat
 ## Manage a 2FA database from the commandline
-* **v0.6.1**
+* **v0.6.2**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
@@ -37,7 +37,7 @@ GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.6.1 - Manage a 2FA database from the commandline
+twofat v0.6.2 - Manage a 2FA database from the commandline
 * Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
 * Database:  ~/.twofat.enc
 * Usage:     twofat [COMMAND]

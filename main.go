@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.6.1"
+	version    = "0.6.2"
 	maxNameLen = 17
 )
 
@@ -308,13 +308,24 @@ func showCodes(regex string) {
 			names = append(names, name)
 		}
 	}
-	if len(names) == 0 {
+	nn := len(names)
+	if nn == 0 {
 		fmt.Printf(red+"No entries")
 		if regex != "" {
 			fmt.Println(" matching Regex '"+regex+"'")
 		}
 		fmt.Println(def)
 		return
+	}
+
+	// Check display capabilities
+	w, h, _ := terminal.GetSize(int(os.Stdout.Fd()))
+	cols := (w + 1) / (8 + 1 + maxNameLen + 1)
+	if cols < 1 {
+		exitOnError(errr, "Terminal too narrow to properly display entries")
+	}
+	if nn > cols*(h-1) {
+		exitOnError(errr, "Terminal height too low, select fewer entries with REGEX")
 	}
 	sort.Strings(names)
 
@@ -323,10 +334,7 @@ func showCodes(regex string) {
 	go enter(ch)
 	for {
 		fmt.Printf(cls+blue+"   Code   Name")
-		if len(names) > 1 {
-			fmt.Printf("                Code   Name")
-		}
-		if len(names) > 2 {
+		for i := 1; i < cols && i < nn; i++ {
 			fmt.Printf("                Code   Name")
 		}
 		fmt.Println()
@@ -340,13 +348,13 @@ func showCodes(regex string) {
 			}
 			fmt.Printf(fmtstr, green+code+def, tag)
 			n += 1
-			if n%3 == 0 {
+			if n%cols == 0 {
 				fmt.Println()
 			} else {
 				fmt.Printf(" ")
 			}
 		}
-		if n%3 > 0 {
+		if n%cols > 0 {
 			fmt.Println()
 		}
 		left := 30 - time.Now().Unix()%30
@@ -354,7 +362,7 @@ func showCodes(regex string) {
 			select {
 				case <-ch:
 				default:
-					fmt.Printf(blue+"\r Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
+					fmt.Printf(blue+"\r Left:"+yellow+" %2d"+blue+"s  "+def+"[exit: "+green+"Enter"+def+"]", left)
 					time.Sleep(time.Second)
 					left--
 			}
