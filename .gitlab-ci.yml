@@ -15,3 +15,10 @@ building:
     - GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o twofat_bsd
     - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
     - GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
+  artifacts:
+    paths:
+     - twofat
+     - twofat_pi
+     - twofat_bsd
+     - twofat_osx
+     - twofat.exe
