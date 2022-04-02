@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.6.2"
+	version    = "0.6.3"
 	maxNameLen = 17
 )
 
@@ -105,7 +105,7 @@ func addEntry(name, secret string) {
 		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for adding entry")
+	exitOnError(err, "Failure opening data file for adding entry")
 	action := "added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
@@ -149,7 +149,7 @@ func addEntry(name, secret string) {
 		Digits: digits,
 	}
 	err = saveDb(&db)
-	exitOnError(err, cls+"Failure saving database, entry not "+action)
+	exitOnError(err, cls+"Failure saving data file, entry not "+action)
 	fmt.Printf(cls+green+" Entry '"+yellow+name+green+" %s\n", action)
 	ch := make(chan bool,1)
 	go enter(ch)
@@ -207,7 +207,7 @@ func showTotp(secret string) {
 
 func deleteEntry(name string) {
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for deleting entry")
+	exitOnError(err, "Failure opening data file for deleting entry")
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
 			fmt.Printf(yellow+"Sure to delete entry '"+name+"'? [y/N] ")
@@ -220,7 +220,7 @@ func deleteEntry(name string) {
 		}
 		delete(db.Entries, name)
 		err = saveDb(&db)
-		exitOnError(err, "Failure saving database, entry not deleted")
+		exitOnError(err, "Failure saving data file, entry not deleted")
 		fmt.Println(green+"Entry '"+name+"' deleted")
 	} else {
 		fmt.Println(red+"Entry '"+name+"' not found")
@@ -229,18 +229,18 @@ func deleteEntry(name string) {
 
 func changePassword() {
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for changing password")
+	exitOnError(err, "Failure opening data file for changing password")
 	fmt.Println(green+"Changing password")
 	err = initPassword(&db)
 	exitOnError(err, "Failure changing password")
 	err = saveDb(&db)
-	exitOnError(err, "Failure saving database, password not changed")
+	exitOnError(err, "Failure saving data file, password not changed")
 	fmt.Println(green+"Password change successful")
 }
 
 func revealSecret(name string) {
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for revealing Secret")
+	exitOnError(err, "Failure opening data file for revealing Secret")
 	secret := db.Entries[name].Secret
 	if secret == "" {
 		fmt.Println(red+"Entry '"+name+"' not found")
@@ -266,7 +266,7 @@ func renameEntry(name string, nname string) {
 		exitOnError(errr, "NEWNAME longer than "+fmt.Sprint(maxNameLen))
 	}
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for renaming of entry")
+	exitOnError(err, "Failure opening data file for renaming of entry")
 
 	if _, found := db.Entries[name]; found {
 		if _, found := db.Entries[nname]; found {
@@ -279,13 +279,13 @@ func renameEntry(name string, nname string) {
 	db.Entries[nname] = db.Entries[name]
 	delete(db.Entries, name)
 	err = saveDb(&db)
-	exitOnError(err, "Failure saving database, entry not renamed")
+	exitOnError(err, "Failure saving data file, entry not renamed")
 	fmt.Println(green+"Entry '"+name+"' renamed to '"+nname+"'")
 }
 
 func clipCode(name string) {
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for copying Code to clipboard")
+	exitOnError(err, "Failure opening data file for copying Code to clipboard")
 	if secret := db.Entries[name].Secret; secret == "" {
 		fmt.Println(red+"Entry '"+name+"' not found")
 		return
@@ -299,7 +299,7 @@ func clipCode(name string) {
 
 func showCodes(regex string) {
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for showing Codes")
+	exitOnError(err, "Failure opening data file for showing Codes")
 
 	// Match regex and sort on name
 	var names []string
@@ -372,7 +372,7 @@ func showCodes(regex string) {
 
 func showNames(regex string) {
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for showing Names")
+	exitOnError(err, "Failure opening data file for showing Names")
 
 	// Match regex and sort on name
 	var names []string
@@ -402,7 +402,7 @@ func exportEntries(filename string) {
 		exitOnError(err, "Cannot create file or file exists")
 	}
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for showing Names")
+	exitOnError(err, "Failure opening data file for showing Names")
 
 	for name := range db.Entries {
 		_, err = f.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%d\"\n", name, db.Entries[name].Secret, db.Entries[name].Digits))
@@ -414,12 +414,12 @@ func exportEntries(filename string) {
 
 func importEntries(filename string) {
 	csvfile, err := os.Open(filename)
-	exitOnError(err, "Could not open database file '"+filename+"'")
+	exitOnError(err, "Could not open data file '"+filename+"'")
 	reader := csv.NewReader(bufio.NewReader(csvfile))
 	db, err := readDb()
-	exitOnError(err, "Failure opening database for import")
+	exitOnError(err, "Failure opening data file for import")
 
-	// Check data, then admit to database, but only save when no errors
+	// Check data, then admit to data file, but only save when no errors
 	n, ns := 0, ""
 	var name, secret string
 	var digits int
@@ -668,12 +668,12 @@ func main() {
 
 func usage(err string) {
 	help := green+self+" v"+version+def+
-		" - Manage a 2FA database from the commandline\n"+
+		" - Manage TOTP data from CLI\n"+
 		"* "+blue+"Repo"+def+
-		":      "+yellow+"github.com/pepa65/twofat"+def+
-		" <pepa65@passchier.net>\n* "+blue+"Database"+def+":  "+yellow+dbPath+
-		def+"\n* "+blue+"Usage"+def+":     "+self+" ["+green+"COMMAND"+def+"]\n"+
-		green+"  COMMAND"+def+":"+`
+		":       "+yellow+"github.com/pepa65/twofat"+def+
+		" <pepa65@passchier.net>\n* "+blue+"Data file"+def+":  "+yellow+dbPath+
+		def+"  (depends on binary file name)\n* "+blue+"Usage"+def+":      "+self+
+		" ["+green+"COMMAND"+def+"]\n"+green+"  COMMAND"+def+":"+`
 [ show | view ]  [REGEX]
     Show all Codes [with Names matching REGEX] (the command is optional).
 list | ls  [REGEX]
@@ -685,7 +685,7 @@ add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
 totp | temp  [-7|-8]  [SECRET]
     Show the Code for SECRET (queried when not given).
     When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
-    (The database is not queried nor written to.)
+    (The data file is not queried nor written to.)
 delete | remove | rm  NAME  [-f|--force]
     Delete entry NAME. If -f/--force: no confirmation asked.
 rename | move | mv  NAME  NEWNAME  [-f|--force]
@@ -696,7 +696,7 @@ import  FILE  [-f|--force]
 export  FILE                Export all entries to CSV-file FILE.
 reveal | secret  NAME       Show Secret of entry NAME.
 clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
-password | passwd | pw      Change database encryption password.
+password | passwd | pw      Change data file encryption password.
 version | --version | -V    Show version.
 help | --help | -h          Show this help text.`
 	fmt.Println(help)

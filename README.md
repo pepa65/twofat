@@ -1,6 +1,6 @@
 # twofat
-## Manage a 2FA database from the commandline
-* **v0.6.2**
+## Manage TOTP data from CLI
+* **v0.6.3**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
@@ -37,10 +37,10 @@ GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.6.2 - Manage a 2FA database from the commandline
-* Repo:      github.com/pepa65/twofat <pepa65@passchier.net>
-* Database:  ~/.twofat.enc
-* Usage:     twofat [COMMAND]
+twofat v0.6.3 - Manage TOTP data from CLI
+* Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
+* Data file:  ~/.twofat.enc  (depends on binary file name)
+* Usage:      twofat [COMMAND]
   COMMAND:
 [ show | view ]  [REGEX]
     Show all Codes [with Names matching REGEX] (the command is optional).
@@ -53,7 +53,7 @@ add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
 totp | temp  [-7|-8]  [SECRET]
     Show the Code for SECRET (queried when not given).
     When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
-    (The database is not queried nor written to.)
+    (The data file is not queried nor written to.)
 delete | remove | rm  NAME  [-f|--force]
     Delete entry NAME. If -f/--force: no confirmation asked.
 rename | move | mv  NAME  NEWNAME  [-f|--force]
@@ -64,7 +64,7 @@ import  FILE  [-f|--force]
 export  FILE                Export all entries to CSV-file FILE.
 reveal | secret  NAME       Show Secret of entry NAME.
 clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
-password | passwd | pw      Change database encryption password.
+password | passwd | pw      Change data file encryption password.
 version | --version | -V    Show version.
 help | --help | -h          Show this help text.
 ```
