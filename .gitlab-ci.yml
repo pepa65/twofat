@@ -2,7 +2,9 @@ image: golang:latest
 
 stages:
   - build
-  - deploy
+
+variables:
+  TAG_LATEST: https://registry.gitlab.com/pepa65/twofat/master:latest
 
 building:
   stage: build
@@ -12,3 +14,4 @@ building:
     - GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
     - GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o twofat_bsd
     - GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
+    - GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
