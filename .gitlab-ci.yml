@@ -16,15 +16,7 @@ building:
     name: twofat
     paths:
      - twofat
-    name: twofat_pi
-    paths:
      - twofat_pi
-    name: twofat_bsd
-    paths:
      - twofat_bsd
-    name: twofat_osx
-    paths:
      - twofat_osx
-    name: twofat.exe
-    paths:
      - twofat.exe
