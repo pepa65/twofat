@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/crypto/ssh/terminal"
 	"github.com/atotto/clipboard"
+	"golang.org/x/crypto/ssh/terminal"
 )
 
 const (
@@ -41,7 +41,7 @@ func exitOnError(err error, errMsg string) {
 
 func enter(ch chan bool) {
 	terminal.ReadPassword(0)
-	ch <-true
+	ch <- true
 	fmt.Printf(cls)
 	os.Exit(0)
 }
@@ -57,8 +57,8 @@ func toBytes(value int64) []byte {
 }
 
 func toUint32(bytes []byte) uint32 {
-	return (uint32(bytes[0]) << 24)+(uint32(bytes[1]) << 16)+
-		(uint32(bytes[2]) << 8)+uint32(bytes[3])
+	return (uint32(bytes[0]) << 24) + (uint32(bytes[1]) << 16) +
+		(uint32(bytes[2]) << 8) + uint32(bytes[3])
 }
 
 func oneTimePassword(keyStr string) string {
@@ -94,7 +94,7 @@ func checkBase32(secret string) string {
 	}
 	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 	if e != nil {
-		fmt.Println(red+"Invalid base32"+def+" (Valid characters: 2-7 and A-Z; ignored: spaces and dashes)")
+		fmt.Println(red + "Invalid base32" + def + " (Valid characters: 2-7 and A-Z; ignored: spaces and dashes)")
 		return ""
 	}
 	return secret
@@ -109,11 +109,11 @@ func addEntry(name, secret string) {
 	action := "added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf(yellow+"Entry '"+name+"' exists, confirm change [y/N] ")
+			fmt.Printf(yellow + "Entry '" + name + "' exists, confirm change [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadByte()
 			if cfm != 'y' {
-				fmt.Println(red+"Entry not changed")
+				fmt.Println(red + "Entry not changed")
 				return
 			}
 		}
@@ -124,7 +124,7 @@ func addEntry(name, secret string) {
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
 	for secret == "" {
-		fmt.Printf(yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
+		fmt.Printf(yellow + "Enter base32 Secret" + def + " [empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
 		if secret == "" {
@@ -133,7 +133,7 @@ func addEntry(name, secret string) {
 		secret = checkBase32(secret)
 	}
 	if secret == "" {
-		fmt.Println(cls+red+"Adding entry '"+name+"' cancelled")
+		fmt.Println(cls + red + "Adding entry '" + name + "' cancelled")
 		return
 	}
 
@@ -151,17 +151,17 @@ func addEntry(name, secret string) {
 	err = saveDb(&db)
 	exitOnError(err, cls+"Failure saving data file, entry not "+action)
 	fmt.Printf(cls+green+" Entry '"+yellow+name+green+" %s\n", action)
-	ch := make(chan bool,1)
+	ch := make(chan bool, 1)
 	go enter(ch)
 	for {
 		select {
-			case <-ch:
-			default:
-				code := oneTimePassword(db.Entries[name].Secret)
-				code = code[len(code)-db.Entries[name].Digits:]
-				left := 30 - time.Now().Unix()%30
-				fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
-				time.Sleep(time.Second)
+		case <-ch:
+		default:
+			code := oneTimePassword(db.Entries[name].Secret)
+			code = code[len(code)-db.Entries[name].Digits:]
+			left := 30 - time.Now().Unix()%30
+			fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
+			time.Sleep(time.Second)
 		}
 	}
 }
@@ -171,7 +171,7 @@ func showTotp(secret string) {
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
 	for secret == "" {
-		fmt.Printf(yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
+		fmt.Printf(yellow + "Enter base32 Secret" + def + " [empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
 		if secret == "" {
@@ -190,17 +190,17 @@ func showTotp(secret string) {
 	if digits8 {
 		digits = 8
 	}
-	ch := make(chan bool,1)
+	ch := make(chan bool, 1)
 	go enter(ch)
 	for {
 		select {
-			case <-ch:
-			default:
-				code := oneTimePassword(strings.ToUpper(secret))
-				code = code[len(code)-digits:]
-				left := 30 - time.Now().Unix()%30
-				fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
-				time.Sleep(time.Second)
+		case <-ch:
+		default:
+			code := oneTimePassword(strings.ToUpper(secret))
+			code = code[len(code)-digits:]
+			left := 30 - time.Now().Unix()%30
+			fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
+			time.Sleep(time.Second)
 		}
 	}
 }
@@ -210,32 +210,32 @@ func deleteEntry(name string) {
 	exitOnError(err, "Failure opening data file for deleting entry")
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Printf(yellow+"Sure to delete entry '"+name+"'? [y/N] ")
+			fmt.Printf(yellow + "Sure to delete entry '" + name + "'? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadByte()
 			if cfm != 'y' {
-				fmt.Println(red+"Entry not deleted")
+				fmt.Println(red + "Entry not deleted")
 				return
 			}
 		}
 		delete(db.Entries, name)
 		err = saveDb(&db)
 		exitOnError(err, "Failure saving data file, entry not deleted")
-		fmt.Println(green+"Entry '"+name+"' deleted")
+		fmt.Println(green + "Entry '" + name + "' deleted")
 	} else {
-		fmt.Println(red+"Entry '"+name+"' not found")
+		fmt.Println(red + "Entry '" + name + "' not found")
 	}
 }
 
 func changePassword() {
 	db, err := readDb()
 	exitOnError(err, "Failure opening data file for changing password")
-	fmt.Println(green+"Changing password")
+	fmt.Println(green + "Changing password")
 	err = initPassword(&db)
 	exitOnError(err, "Failure changing password")
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving data file, password not changed")
-	fmt.Println(green+"Password change successful")
+	fmt.Println(green + "Password change successful")
 }
 
 func revealSecret(name string) {
@@ -243,17 +243,18 @@ func revealSecret(name string) {
 	exitOnError(err, "Failure opening data file for revealing Secret")
 	secret := db.Entries[name].Secret
 	if secret == "" {
-		fmt.Println(red+"Entry '"+name+"' not found")
+		fmt.Println(red + "Entry '" + name + "' not found")
 		return
 	}
-	fmt.Printf(blue+"%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n",	name, secret, secret, db.Entries[name].Digits)
-	fmt.Printf(def+"[Press Enter to exit] ")
+	fmt.Printf(blue+"%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n", name, secret, secret, db.Entries[name].Digits)
+	fmt.Printf(def + "[Press Enter to exit] ")
 	ch := make(chan bool)
 	go enter(ch)
 	for {
 		select {
-			case <-ch:
-			default: time.Sleep(time.Second)
+		case <-ch:
+		default:
+			time.Sleep(time.Second)
 		}
 	}
 }
@@ -280,14 +281,14 @@ func renameEntry(name string, nname string) {
 	delete(db.Entries, name)
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving data file, entry not renamed")
-	fmt.Println(green+"Entry '"+name+"' renamed to '"+nname+"'")
+	fmt.Println(green + "Entry '" + name + "' renamed to '" + nname + "'")
 }
 
 func clipCode(name string) {
 	db, err := readDb()
 	exitOnError(err, "Failure opening data file for copying Code to clipboard")
 	if secret := db.Entries[name].Secret; secret == "" {
-		fmt.Println(red+"Entry '"+name+"' not found")
+		fmt.Println(red + "Entry '" + name + "' not found")
 		return
 	}
 	code := oneTimePassword(db.Entries[name].Secret)
@@ -310,9 +311,9 @@ func showCodes(regex string) {
 	}
 	nn := len(names)
 	if nn == 0 {
-		fmt.Printf(red+"No entries")
+		fmt.Printf(red + "No entries")
 		if regex != "" {
-			fmt.Println(" matching Regex '"+regex+"'")
+			fmt.Println(" matching Regex '" + regex + "'")
 		}
 		fmt.Println(def)
 		return
@@ -329,11 +330,11 @@ func showCodes(regex string) {
 	}
 	sort.Strings(names)
 
-	fmtstr := "%s %-"+fmt.Sprint(maxNameLen)+"s"
-	ch := make(chan bool,1)
+	fmtstr := "%s %-" + fmt.Sprint(maxNameLen) + "s"
+	ch := make(chan bool, 1)
 	go enter(ch)
 	for {
-		fmt.Printf(cls+blue+"   Code   Name")
+		fmt.Printf(cls + blue + "   Code   Name")
 		for i := 1; i < cols && i < nn; i++ {
 			fmt.Printf("                Code   Name")
 		}
@@ -360,11 +361,11 @@ func showCodes(regex string) {
 		left := 30 - time.Now().Unix()%30
 		for left > 0 {
 			select {
-				case <-ch:
-				default:
-					fmt.Printf(blue+"\r Left:"+yellow+" %2d"+blue+"s  "+def+"[exit: "+green+"Enter"+def+"]", left)
-					time.Sleep(time.Second)
-					left--
+			case <-ch:
+			default:
+				fmt.Printf(blue+"\r Left:"+yellow+" %2d"+blue+"s  "+def+"[exit: "+green+"Enter"+def+"]", left)
+				time.Sleep(time.Second)
+				left--
 			}
 		}
 	}
@@ -382,9 +383,9 @@ func showNames(regex string) {
 		}
 	}
 	if len(names) == 0 {
-		fmt.Printf(red+"No entries")
+		fmt.Printf(red + "No entries")
 		if regex != "" {
-			fmt.Printf(" matching Regex '"+regex+"'")
+			fmt.Printf(" matching Regex '" + regex + "'")
 		}
 		fmt.Println(def)
 		return
@@ -397,7 +398,7 @@ func showNames(regex string) {
 }
 
 func exportEntries(filename string) {
-	f, err := os.OpenFile(filename, os.O_WRONLY | os.O_CREATE | os.O_EXCL, 0400)
+	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0400)
 	if err != nil {
 		exitOnError(err, "Cannot create file or file exists")
 	}
@@ -407,7 +408,7 @@ func exportEntries(filename string) {
 	for name := range db.Entries {
 		_, err = f.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%d\"\n", name, db.Entries[name].Secret, db.Entries[name].Digits))
 		if err != nil {
-			exitOnError(err, "Error writing to " + filename)
+			exitOnError(err, "Error writing to "+filename)
 		}
 	}
 }
@@ -437,9 +438,12 @@ func importEntries(filename string) {
 		name = line[0]
 		secret = line[1]
 		switch line[2] {
-		case "6": digits = 6
-		case "7": digits = 7
-		case "8": digits = 8
+		case "6":
+			digits = 6
+		case "7":
+			digits = 7
+		case "8":
+			digits = 8
 		default:
 			exitOnError(err, "Codelength (field 3) on line "+ns+"not 6/7/8: "+
 				line[2])
@@ -452,7 +456,7 @@ func importEntries(filename string) {
 		}
 		if len(name) > maxNameLen {
 			if forceChange {
-				fmt.Printf(yellow + "WARNING" +def + ": Name (field 1) longer than %d on line %d\n", maxNameLen, n)
+				fmt.Printf(yellow+"WARNING"+def+": Name (field 1) longer than %d on line %d\n", maxNameLen, n)
 			} else {
 				exitOnError(errr, fmt.Sprintf("Name (field 1) longer than %d on line %d", maxNameLen, n))
 			}
@@ -496,7 +500,7 @@ func main() {
 			case "help", "--help", "-h":
 				usage("")
 			case "version", "--version", "-V":
-				fmt.Println(self+" version "+version)
+				fmt.Println(self + " version " + version)
 				return
 			case "rename", "move", "mv":
 				cmd = "m" // NAME NEWNAME
@@ -667,13 +671,13 @@ func main() {
 }
 
 func usage(err string) {
-	help := green+self+" v"+version+def+
-		" - Manage TOTP data from CLI\n"+
-		"* "+blue+"Repo"+def+
-		":       "+yellow+"github.com/pepa65/twofat"+def+
-		" <pepa65@passchier.net>\n* "+blue+"Data file"+def+":  "+yellow+dbPath+
-		def+"  (depends on binary file name)\n* "+blue+"Usage"+def+":      "+self+
-		" ["+green+"COMMAND"+def+"]\n"+green+"  COMMAND"+def+":"+`
+	help := green + self + " v" + version + def +
+		" - Manage TOTP data from CLI\n" +
+		"* " + blue + "Repo" + def +
+		":       " + yellow + "github.com/pepa65/twofat" + def +
+		" <pepa65@passchier.net>\n* " + blue + "Data file" + def + ":  " + yellow + dbPath +
+		def + "  (depends on binary file name)\n* " + blue + "Usage" + def + ":      " + self +
+		" [" + green + "COMMAND" + def + "]\n" + green + "  COMMAND" + def + ":" + `
 [ show | view ]  [REGEX]
     Show all Codes [with Names matching REGEX] (the command is optional).
 list | ls  [REGEX]
@@ -701,7 +705,7 @@ version | --version | -V    Show version.
 help | --help | -h          Show this help text.`
 	fmt.Println(help)
 	if err != "" {
-		fmt.Println(red+"Abort: "+err)
+		fmt.Println(red + "Abort: " + err)
 		os.Exit(5)
 	}
 	os.Exit(0)

@@ -12,8 +12,8 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/user"
 	"os/exec"
+	"os/user"
 	"path"
 	"strings"
 
