@@ -1,6 +1,6 @@
 # twofat
 ## Manage TOTP data from CLI
-* **v0.6.3**
+* **v0.6.4**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
