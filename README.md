@@ -28,11 +28,11 @@ go build -ldflags="-s -w"
 upx --brute twofat*
 
 # Build for various architectures:
-GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o twofat
-GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
-GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o twofat_bsd
-GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
-GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
+CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o twofat
+CGO_ENABLED=0 GOOS=linux GOARCH=arm go build -ldflags="-s -w" -o twofat_pi
+CGO_ENABLED=0 GOOS=freebsd GOARCH=amd64 go build -ldflags="-s -w" -o twofat_bsd
+CGO_ENABLED=0 GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o twofat_osx
+CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 ```
 
 ## Usage
