@@ -1,6 +1,6 @@
 # twofat
 ## Manage TOTP data from CLI
-* **v0.6.4**
+* **v0.6.5**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: pepa65 <pepa65@passchier.net>
@@ -37,7 +37,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.6.3 - Manage TOTP data from CLI
+twofat v0.6.5 - Manage TOTP data from CLI
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
 * Data file:  ~/.twofat.enc  (depends on binary file name)
 * Usage:      twofat [COMMAND]

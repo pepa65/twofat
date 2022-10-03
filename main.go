@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.6.4"
+	version    = "0.6.5"
 	maxNameLen = 17
 )
 
@@ -503,7 +503,7 @@ func main() {
 				fmt.Println(self + " version " + version)
 				return
 			case "rename", "move", "mv":
-				cmd = "m" // NAME NEWNAME
+				cmd = "m" // NAME NEWNAME -f/--force
 			case "add", "insert", "entry":
 				cmd = "a" // NAME SECRET -7 -8 -f/--force
 			case "totp", "temp":
@@ -572,6 +572,10 @@ func main() {
 			}
 			name = arg
 		case "m":
+			if !ddash && (arg == "-f" || arg == "--force") {
+				forceChange = true
+				continue
+			}
 			if name != "" {
 				if nname != "" {
 					usage("too many arguments, NAME and NEWNAME already given")
