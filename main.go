@@ -5,13 +5,13 @@ import (
 	"crypto/hmac"
 	"crypto/sha1"
 	"encoding/base32"
-	"encoding/csv"
 	"errors"
 	"fmt"
-	"io"
 	"os"
+	"net/url"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -20,14 +20,14 @@ import (
 )
 
 const (
-	version    = "0.6.5"
-	maxNameLen = 17
+	version    = "0.7.1"
+	maxNameLen = 20
+	period     = 30
 )
 
 var (
 	errr        = errors.New("Error")
 	forceChange = false
-	digits7     = false
 	digits8     = false
 	interrupt   = make(chan os.Signal)
 )
@@ -68,7 +68,7 @@ func oneTimePassword(keyStr string) string {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(2)
 	}
-	value := toBytes(time.Now().Unix() / 30)
+	value := toBytes(time.Now().Unix() / period)
 
 	// Sign the value using HMAC-SHA1
 	hmacSha1 := hmac.New(sha1.New, byteSecret)
@@ -138,9 +138,6 @@ func addEntry(name, secret string) {
 	}
 
 	digits := 6
-	if digits7 {
-		digits = 7
-	}
 	if digits8 {
 		digits = 8
 	}
@@ -159,7 +156,7 @@ func addEntry(name, secret string) {
 		default:
 			code := oneTimePassword(db.Entries[name].Secret)
 			code = code[len(code)-db.Entries[name].Digits:]
-			left := 30 - time.Now().Unix()%30
+			left := period - time.Now().Unix()%period
 			fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
 			time.Sleep(time.Second)
 		}
@@ -184,9 +181,6 @@ func showTotp(secret string) {
 	}
 
 	digits := 6
-	if digits7 {
-		digits = 7
-	}
 	if digits8 {
 		digits = 8
 	}
@@ -198,7 +192,7 @@ func showTotp(secret string) {
 		default:
 			code := oneTimePassword(strings.ToUpper(secret))
 			code = code[len(code)-digits:]
-			left := 30 - time.Now().Unix()%30
+			left := period - time.Now().Unix()%period
 			fmt.Printf(blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press Enter to exit] ", left)
 			time.Sleep(time.Second)
 		}
@@ -246,7 +240,8 @@ func revealSecret(name string) {
 		fmt.Println(red + "Entry '" + name + "' not found")
 		return
 	}
-	fmt.Printf(blue+"%s: %s\notpauth://totp/default?secret=%s&period=30&digits=%d\n", name, secret, secret, db.Entries[name].Digits)
+	fmt.Printf(blue+"%s: %s\notpauth://totp/%s?secret=%s&digits=%d\n",
+		name, secret, url.PathEscape(name), secret, db.Entries[name].Digits)
 	fmt.Printf(def + "[Press Enter to exit] ")
 	ch := make(chan bool)
 	go enter(ch)
@@ -294,7 +289,7 @@ func clipCode(name string) {
 	code := oneTimePassword(db.Entries[name].Secret)
 	code = code[len(code)-db.Entries[name].Digits:]
 	clipboard.WriteAll(code)
-	left := 30 - time.Now().Unix()%30
+	left := period - time.Now().Unix()%period
 	fmt.Printf(green+"Code of "+yellow+"'"+name+"'"+green+" copied to clipboard, valid for"+yellow+" %d "+green+"s\n", left)
 }
 
@@ -334,9 +329,9 @@ func showCodes(regex string) {
 	ch := make(chan bool, 1)
 	go enter(ch)
 	for {
-		fmt.Printf(cls + blue + "   Code   Name")
+		fmt.Printf(cls + blue + "   Code - Name")
 		for i := 1; i < cols && i < nn; i++ {
-			fmt.Printf("                Code   Name")
+			fmt.Printf(strings.Repeat(" ", maxNameLen-1)+"Code - Name")
 		}
 		fmt.Println()
 		n := 0
@@ -358,7 +353,7 @@ func showCodes(regex string) {
 		if n%cols > 0 {
 			fmt.Println()
 		}
-		left := 30 - time.Now().Unix()%30
+		left := period - time.Now().Unix()%period
 		for left > 0 {
 			select {
 			case <-ch:
@@ -406,77 +401,86 @@ func exportEntries(filename string) {
 	exitOnError(err, "Failure opening data file for showing Names")
 
 	for name := range db.Entries {
-		_, err = f.WriteString(fmt.Sprintf("\"%s\",\"%s\",\"%d\"\n", name, db.Entries[name].Secret, db.Entries[name].Digits))
+		_, err = f.WriteString(fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%d\n",
+			url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits))
 		if err != nil {
 			exitOnError(err, "Error writing to "+filename)
 		}
 	}
+	fmt.Printf("%sFile exported:%s %s\n",green, def, filename)
 }
 
 func importEntries(filename string) {
-	csvfile, err := os.Open(filename)
+	file, err := os.Open(filename)
 	exitOnError(err, "Could not open data file '"+filename+"'")
-	reader := csv.NewReader(bufio.NewReader(csvfile))
+	reader := bufio.NewScanner(file)
+	reader.Split(bufio.ScanLines)
 	db, err := readDb()
 	exitOnError(err, "Failure opening data file for import")
 
 	// Check data, then admit to data file, but only save when no errors
 	n, ns := 0, ""
-	var name, secret string
-	var digits int
-	for {
-		line, err := reader.Read()
-		if err == io.EOF {
-			break
-		}
+	for reader.Scan() {
+		digits, secret := 6, ""
+		line := reader.Text()
 		n++
 		ns = fmt.Sprint(n)
-		exitOnError(err, "Error reading CSV data on line "+ns)
-		if len(line) != 3 {
-			exitOnError(errr, "Line "+ns+" doesn't have 3 fields")
+		uri, err := url.Parse(line)
+		exitOnError(err, "Invalid URI")
+		if uri.Scheme != "otpauth" {
+			exitOnError(errr, "URI scheme is not 'otpauth'")
 		}
-		name = line[0]
-		secret = line[1]
-		switch line[2] {
-		case "6":
-			digits = 6
-		case "7":
-			digits = 7
-		case "8":
-			digits = 8
-		default:
-			exitOnError(err, "Codelength (field 3) on line "+ns+"not 6/7/8: "+
-				line[2])
+		if uri.Host != "totp" {
+			exitOnError(errr, "The application is not 'totp'")
 		}
-		if name == "" {
-			exitOnError(errr, "Name (field 1) empty on line "+ns)
-		}
-		if secret == "" {
-			exitOnError(errr, "Secret (field 2) empty on line "+ns)
+		name := url.QueryEscape(uri.Path[1:])
+		if len(name) == 0 {
+			exitOnError(errr, "NAME must have content on line "+ns)
 		}
 		if len(name) > maxNameLen {
 			if forceChange {
-				fmt.Printf(yellow+"WARNING"+def+": Name (field 1) longer than %d on line %d\n", maxNameLen, n)
+				fmt.Printf(yellow+"WARNING"+def+": NAME longer than %d on line %d\n", maxNameLen, n)
 			} else {
-				exitOnError(errr, fmt.Sprintf("Name (field 1) longer than %d on line %d", maxNameLen, n))
+				exitOnError(errr, fmt.Sprintf("NAME longer than %d on line %d", maxNameLen, n))
 			}
 		}
-		if _, found := db.Entries[name]; found && !forceChange {
+		_, found := db.Entries[name]
+		if found && !forceChange {
 			exitOnError(errr, "Entry '"+name+"' on line "+ns+" exists, force overwrite with -f/--force")
 		}
-		if _, err := base32.StdEncoding.WithPadding(base32.NoPadding).
-			DecodeString(strings.ToUpper(secret)); err != nil {
-			exitOnError(err, "Invalid base32 encoding in Secret (field 2) on line "+
-				ns)
+		query, err := url.ParseQuery(uri.RawQuery)
+		exitOnError(err, "Invalid Query part of URI")
+		for key, value := range query {
+			switch key {
+			case "secret":
+				if len(value) > 1 {
+					exitOnError(errr, "Multiple SECRETs on line "+ns)
+				}
+				secret = value[0]
+				_, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(secret))
+				exitOnError(err, "Invalid base32 encoding in SECRET on line "+ns)
+			case "digits":
+				if len(value) > 1 {
+					exitOnError(errr, "Multiple Code LENGTHs (key 'digits') on line "+ns)
+				}
+				digits, err = strconv.Atoi(value[0])
+				exitOnError(err, "Code LENGTHs (key 'digits') not an integer")
+				if digits != 6 && digits != 8 {
+					exitOnError(errr, "Code LENGTH (key 'digits') on line "+ns+"not 6/8: "+value[0])
+				}
+			default:
+				fmt.Printf(yellow+"WARNING"+def+": key '"+key+"' on line "+ns+" unsupported\n")
+			}
 		}
-		if digits < 6 || digits > 8 {
-			exitOnError(errr, "Codelength (field 3) not 6, 7 or 8 on line "+ns)
+		if len(secret) == 0 {
+			exitOnError(errr, "SECRET must be given on line "+ns)
 		}
 		db.Entries[name] = entry{
 			Secret: strings.ToUpper(secret),
 			Digits: digits,
 		}
 	}
+	file.Close()
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, entries not imported")
 	fmt.Printf(green+"All %d entries in '"+filename+"' successfully imported\n", n)
@@ -484,7 +488,7 @@ func importEntries(filename string) {
 }
 
 func main() {
-	self, cmd, regex, name, nname, secret, csvfile, ddash := "", "", "", "", "", "", "", false
+	self, cmd, regex, name, nname, secret, file, ddash := "", "", "", "", "", "", "", false
 	for _, arg := range os.Args {
 		if self == "" { // Get binary name (arg0)
 			selves := strings.Split(arg, "/")
@@ -505,9 +509,9 @@ func main() {
 			case "rename", "move", "mv":
 				cmd = "m" // NAME NEWNAME -f/--force
 			case "add", "insert", "entry":
-				cmd = "a" // NAME SECRET -7 -8 -f/--force
+				cmd = "a" // NAME SECRET -8 -f/--force
 			case "totp", "temp":
-				cmd = "t" // SECRET -7 -8
+				cmd = "t" // SECRET -8
 			case "reveal", "secret":
 				cmd = "r" // NAME
 			case "clip", "copy", "cp":
@@ -544,19 +548,19 @@ func main() {
 			}
 			regex = arg
 		case "e":
-			if csvfile != "" {
-				usage("too many arguments, CSV-file FILE already given")
+			if file != "" {
+				usage("too many arguments, file FILE already given")
 			}
-			csvfile = arg
+			file = arg
 		case "i":
 			if !ddash && (arg == "-f" || arg == "--force") {
 				forceChange = true
 				continue
 			}
-			if csvfile != "" {
-				usage("too many arguments, CSV-file FILE already given")
+			if file != "" {
+				usage("too many arguments, file FILE already given")
 			}
-			csvfile = arg
+			file = arg
 		case "d":
 			if !ddash && (arg == "-f" || arg == "--force") {
 				forceChange = true
@@ -589,10 +593,6 @@ func main() {
 				forceChange = true
 				continue
 			}
-			if !ddash && arg == "-7" {
-				digits7 = true
-				continue
-			}
 			if !ddash && arg == "-8" {
 				digits8 = true
 				continue
@@ -606,10 +606,6 @@ func main() {
 				name = arg
 			}
 		case "t":
-			if !ddash && arg == "-7" {
-				digits7 = true
-				continue
-			}
 			if !ddash && arg == "-8" {
 				digits8 = true
 				continue
@@ -627,17 +623,11 @@ func main() {
 	case "l":
 		showNames(regex)
 	case "a":
-		if digits7 && digits8 {
-			usage("can't have both 7 and 8 length Code for the same entry")
-		}
 		if name == "" {
 			usage("'add' command needs NAME as argument")
 		}
 		addEntry(name, secret)
 	case "t":
-		if digits7 && digits8 {
-			usage("can't have both 7 and 8 length Code for the same entry")
-		}
 		showTotp(secret)
 	case "m":
 		if name == "" || nname == "" {
@@ -662,15 +652,15 @@ func main() {
 	case "p":
 		changePassword()
 	case "e":
-		if csvfile == "" {
-			usage("'export' command needs CSV-file FILE as argument")
+		if file == "" {
+			usage("'export' command needs file FILE as argument")
 		}
-		exportEntries(csvfile)
+		exportEntries(file)
 	case "i":
-		if csvfile == "" {
-			usage("'import' command needs CSV-file FILE as argument")
+		if file == "" {
+			usage("'import' command needs file FILE as argument")
 		}
-		importEntries(csvfile)
+		importEntries(file)
 	}
 }
 
@@ -686,22 +676,22 @@ func usage(err string) {
     Show all Codes [with Names matching REGEX] (the command is optional).
 list | ls  [REGEX]
     Show all Names [with Names matching REGEX].
-add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+add | insert | entry  NAME  [-8]  [-f|--force]  [SECRET]
     Add a new entry NAME with SECRET (queried when not given).
-    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    When -8 is given, Code LENGTH is 8 digits, otherwise it is 6.
     If -f/--force: existing NAME overwritten, no NAME length check.
-totp | temp  [-7|-8]  [SECRET]
+totp | temp  [-8]  [SECRET]
     Show the Code for SECRET (queried when not given).
-    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    When -8 is given, Code LENGTH is 8 digits, otherwise it is 6.
     (The data file is not queried nor written to.)
 delete | remove | rm  NAME  [-f|--force]
     Delete entry NAME. If -f/--force: no confirmation asked.
 rename | move | mv  NAME  NEWNAME  [-f|--force]
     Rename entry NAME to NEWNAME, if -f/--force: no length checks.
 import  FILE  [-f|--force]
-    Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
+    Import lines with OTPAUTH_URI from file FILE.
     If -f/--force: existing NAME overwritten, no NAME length check.
-export  FILE                Export all entries to CSV-file FILE.
+export  FILE                Export all entries to OTPAUTH_URI file FILE.
 reveal | secret  NAME       Show Secret of entry NAME.
 clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
 password | passwd | pw      Change data file encryption password.

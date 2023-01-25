@@ -1,17 +1,17 @@
 # twofat
 ## Manage TOTP data from CLI
-* **v0.6.5**
+* **v0.7.1**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
-* Contact: pepa65 <pepa65@passchier.net>
+* Contact: github.com/pepa65
 * Install: `wget -qO- gobinaries.com/pepa65/twofat |sh`
 
 ## Features
 * Data saved with AES-GCM encrypt in ~/.twofat.enc, password changeable.
 * Display codes of names matching regex, which auto-refresh.
 * Add, rename, delete entry, reveal secret, copy code to clipboard.
-* Import entries from CSV.
-* Displays well in 80-colums (or more) terminals. Maximum NAME length is set to 17.
+* Import & export entries from & to standardized OTPAUTH_URI file.
+* Displays well in 80-colums (or more) terminals. NAME display truncated to 20.
 
 ## Build
 ```shell
@@ -37,8 +37,8 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.6.5 - Manage TOTP data from CLI
-* Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
+twofat v0.7.1 - Manage TOTP data from CLI
+* Repo:       github.com/pepa65/twofat
 * Data file:  ~/.twofat.enc  (depends on binary file name)
 * Usage:      twofat [COMMAND]
   COMMAND:
@@ -46,25 +46,31 @@ twofat v0.6.5 - Manage TOTP data from CLI
     Show all Codes [with Names matching REGEX] (the command is optional).
 list | ls  [REGEX]
     Show all Names [with Names matching REGEX].
-add | insert | entry  NAME  [-7|-8]  [-f|--force]  [SECRET]
+add | insert | entry  NAME  [-8]  [-f|--force]  [SECRET]
     Add a new entry NAME with SECRET (queried when not given).
-    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    When -8 is given, Code LENGTH is 8 digits, otherwise it is 6.
     If -f/--force: existing NAME overwritten, no NAME length check.
-totp | temp  [-7|-8]  [SECRET]
+totp | temp  [-8]  [SECRET]
     Show the Code for SECRET (queried when not given).
-    When -7 or -8 are given, Code length is 7 or 8, otherwise it is 6.
+    When -8 is given, Code LENGTH is 8 digits, otherwise it is 6.
     (The data file is not queried nor written to.)
 delete | remove | rm  NAME  [-f|--force]
     Delete entry NAME. If -f/--force: no confirmation asked.
 rename | move | mv  NAME  NEWNAME  [-f|--force]
     Rename entry NAME to NEWNAME, if -f/--force: no length checks.
 import  FILE  [-f|--force]
-    Import lines with "NAME,SECRET,CODELENGTH" from CSV-file FILE.
+    Import lines with OTPAUTH_URI from file FILE.
     If -f/--force: existing NAME overwritten, no NAME length check.
-export  FILE                Export all entries to CSV-file FILE.
+export  FILE                Export all entries to OTPAUTH_URI file FILE.
 reveal | secret  NAME       Show Secret of entry NAME.
 clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
 password | passwd | pw      Change data file encryption password.
 version | --version | -V    Show version.
 help | --help | -h          Show this help text.
 ```
+
+## Import/Export data
+`twofat` abides by the backup standard from `https://authenticator.cc/docs/en/otp-backup-developer`.
+Each line has a OTPAUTH_URI of the form: `otpauth://totp/NAME?secret=SECRET&digits=LENGTH`.
+(The parameter `period` is fixed to `30` in almost all apps, and most all seem to use `SHA1` for the
+`algorithm` parameter, `twofat` as well. As to `issuer`, this is not used/recorded in `twofat`.)
