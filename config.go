@@ -18,7 +18,7 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/argon2"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 const (
@@ -81,7 +81,7 @@ func readDb() (dbase, error) {
 		exec.Command("reset").Run()
 		fmt.Println("Database: " + blue + dbPath)
 		fmt.Printf(yellow + "Enter database password: " + def)
-		db.Pwd, _ = terminal.ReadPassword(0)
+		db.Pwd, _ = term.ReadPassword(0)
 		fmt.Println()
 		key := deriveKey(db.Pwd, nonce, aesKeySize)
 		block, err := aes.NewCipher(key)
@@ -151,12 +151,12 @@ func initPassword(db *dbase) error {
 	fmt.Println("Database: " + blue + dbPath)
 	for retryTimes > 0 {
 		fmt.Printf(yellow + "New database password: ")
-		pwd, _ := terminal.ReadPassword(0)
+		pwd, _ := term.ReadPassword(0)
 		if len(pwd) == 0 {
 			fmt.Printf(red + "\nPassword can't be empty")
 		} else {
 			fmt.Printf("\nConfirm database password: ")
-			pwdc, _ := terminal.ReadPassword(0)
+			pwdc, _ := term.ReadPassword(0)
 			fmt.Println(def)
 			if bytes.Equal(pwd, pwdc) {
 				db.Pwd = pwd

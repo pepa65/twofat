@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/atotto/clipboard"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
 const (
@@ -29,7 +29,6 @@ var (
 	errr        = errors.New("Error")
 	forceChange = false
 	digits8     = false
-	interrupt   = make(chan os.Signal)
 )
 
 func exitOnError(err error, errMsg string) {
@@ -40,9 +39,9 @@ func exitOnError(err error, errMsg string) {
 }
 
 func enter(ch chan bool) {
-	terminal.ReadPassword(0)
+	term.ReadPassword(0)
 	ch <- true
-	fmt.Printf(cls)
+	fmt.Print(cls)
 	os.Exit(0)
 }
 
@@ -315,7 +314,7 @@ func showCodes(regex string) {
 	}
 
 	// Check display capabilities
-	w, h, _ := terminal.GetSize(int(os.Stdout.Fd()))
+	w, h, _ := term.GetSize(int(os.Stdout.Fd()))
 	cols := (w + 1) / (8 + 1 + maxNameLen + 1)
 	if cols < 1 {
 		exitOnError(errr, "Terminal too narrow to properly display entries")
@@ -484,7 +483,6 @@ func importEntries(filename string) {
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving database, entries not imported")
 	fmt.Printf(green+"All %d entries in '"+filename+"' successfully imported\n", n)
-	return
 }
 
 func main() {

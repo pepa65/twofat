@@ -1,12 +1,12 @@
 # twofat
 ## Manage TOTP data from CLI
-* **v0.7.2**
+* **v0.7.3**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
 * Install: `wget -qO- gobinaries.com/pepa65/twofat |sh`
 
-## Features
+### Features
 * Data saved with AES-GCM encrypt in ~/.twofat.enc, password changeable.
 * Display codes of names matching regex, which auto-refresh.
 * Add, rename, delete entry, reveal secret, copy code to clipboard.
@@ -25,7 +25,7 @@ go get -u github.com/pepa65/twofat
 go build -ldflags="-s -w"
 
 # More extreme shrinking:
-upx --brute twofat*
+upx twofat*
 
 # Build for various architectures:
 CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o twofat
@@ -37,7 +37,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.7.2 - Manage TOTP data from CLI
+twofat v0.7.3 - Manage TOTP data from CLI
 * Repo:       github.com/pepa65/twofat
 * Data file:  ~/.twofat.enc  (depends on binary file name)
 * Usage:      twofat [COMMAND]
@@ -69,8 +69,13 @@ version | --version | -V    Show version.
 help | --help | -h          Show this help text.
 ```
 
-## Import/Export data
+### Import/Export data
 `twofat` abides by the backup standard from `https://authenticator.cc/docs/en/otp-backup-developer`.
 Each line has a OTPAUTH_URI of the form: `otpauth://totp/NAME?secret=SECRET&digits=LENGTH`.
 (The parameter `period` is fixed to `30` in almost all apps, and most all seem to use `SHA1` for the
 `algorithm` parameter, `twofat` as well. As to `issuer`, this is not used/recorded in `twofat`.)
+
+## Release management
+* Before `git commit` adjust the release number in `main.go` and `README.md`.
+* After `git commit` and before `git push`, tag the release: `git tag -a <release>`.
+* After `git commit` do: `goreleaser --clean`.

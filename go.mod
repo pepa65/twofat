@@ -1,10 +1,11 @@
 module github.com/pepa65/twofat
 
-go 1.12
+go 1.19
 
 require (
 	github.com/atotto/clipboard v0.1.4
-	golang.org/x/crypto v0.0.0-20220321153916-2c7772ba3064
-	golang.org/x/sys v0.1.0 // indirect
-	golang.org/x/term v0.0.0-20210927222741-03fcf44c2211 // indirect
+	golang.org/x/crypto v0.8.0
+	golang.org/x/term v0.7.0
 )
+
+require golang.org/x/sys v0.7.0 // indirect
