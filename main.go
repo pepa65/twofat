@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	version    = "0.7.2"
+	version    = "0.7.4"
 	maxNameLen = 20
 	period     = 30
 )
@@ -665,11 +665,12 @@ func main() {
 func usage(err string) {
 	help := green + self + " v" + version + def +
 		" - Manage TOTP data from CLI\n" +
-		"* " + blue + "Repo" + def +
-		":       " + yellow + "github.com/pepa65/twofat" + def +
-		" <pepa65@passchier.net>\n* " + blue + "Data file" + def + ":  " + yellow + dbPath +
-		def + "  (depends on binary file name)\n* " + blue + "Usage" + def + ":      " + self +
-		" [" + green + "COMMAND" + def + "]\n" + green + "  COMMAND" + def + ":" + `
+		"* " + blue + "Repo" + def + ":       " + yellow +
+		"github.com/pepa65/twofat" + def + " <pepa65@passchier.net>\n* " +
+		blue + "Data file" + def + ":  " + yellow + dbPath +
+		def + "  (depends on user's home and binary file name)\n* " +
+		blue + "Usage" + def + ":      " + self + " [" + green + "COMMAND" + def + "]\n" +
+		green + "  COMMAND" + def + ":" + `
 [ show | view ]  [REGEX]
     Show all Codes [with Names matching REGEX] (the command is optional).
 list | ls  [REGEX]
