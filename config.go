@@ -67,7 +67,7 @@ func deriveKey(password []byte, salt []byte, hashLen uint32) (hashRaw []byte) {
 	return argon2.IDKey(password, salt, 3, 65536, 4, hashLen)
 }
 
-func readDb() (dbase, error) {
+func readDb(redirected bool) (dbase, error) {
 	var db dbase
 	if _, err := os.Stat(dbPath); err == nil {
 		// Database file present
@@ -79,19 +79,28 @@ func readDb() (dbase, error) {
 		nonce := dbdata[:nonceSize]
 		encdata := dbdata[nonceSize:]
 		exec.Command("reset").Run()
-		fmt.Println("Database: " + blue + dbPath)
-		fmt.Printf(yellow + "Enter database password: " + def)
-		db.Pwd, _ = term.ReadPassword(0)
-		fmt.Println()
+		if !redirected {
+			fmt.Fprintln(os.Stderr, "Database: " + blue + dbPath + def)
+		}
+		if !term.IsTerminal(0) { // Piped in
+			db.Pwd, _ = io.ReadAll(os.Stdin)
+		}
+		if len(db.Pwd) == 0 {
+			fmt.Fprintf(os.Stderr, yellow + "Enter database password: " + def)
+			db.Pwd, _ = term.ReadPassword(0)
+			fmt.Fprintln(os.Stderr)
+		}
 		key := deriveKey(db.Pwd, nonce, aesKeySize)
 		block, err := aes.NewCipher(key)
 		if err != nil {
 			return dbase{}, errWrongPassword
 		}
+
 		aesGcm, err := cipher.NewGCM(block)
 		if err != nil {
 			return dbase{}, errWrongPassword
 		}
+
 		decryptedData, err := aesGcm.Open(nil, nonce, encdata, nil)
 		if err != nil {
 			return dbase{}, errWrongPassword
@@ -102,12 +111,13 @@ func readDb() (dbase, error) {
 		if err != nil {
 			return dbase{}, errors.New("invalid entries data")
 		}
+
 		return db, nil
 	}
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Println(green + "Initializing database file" + def)
+	fmt.Fprintln(os.Stderr, green + "Initializing database file" + def)
 	initPassword(&db)
 	db.Entries = make(map[string]entry)
 	saveDb(&db)
@@ -121,54 +131,60 @@ func saveDb(db *dbase) error {
 	if err != nil {
 		return errors.New("could not get randomized data")
 	}
+
 	buf.Write(nonce)
 	key := deriveKey(db.Pwd, nonce, aesKeySize)
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return errWrongPassword
 	}
+
 	aesGcm, err := cipher.NewGCM(block)
 	if err != nil {
 		return errWrongPassword
 	}
+
 	var gobBuf bytes.Buffer
 	err = gob.NewEncoder(&gobBuf).Encode(db.Entries)
 	if err != nil {
 		return errors.New("problem encoding data")
 	}
+
 	encryptedData := aesGcm.Seal(nil, nonce, gobBuf.Bytes(), nil)
 	buf.Write(encryptedData)
 	err = ioutil.WriteFile(dbPath, buf.Bytes(), 0600)
 	if err != nil {
 		return errors.New("database write error")
 	}
+
 	return nil
 }
 
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
 	exec.Command("reset").Run()
-	fmt.Println("Database: " + blue + dbPath)
+	fmt.Fprintln(os.Stderr, "Database: " + blue + dbPath + def)
 	for retryTimes > 0 {
-		fmt.Printf(yellow + "New database password: ")
+		fmt.Fprintf(os.Stderr, yellow + "New database password: ")
 		pwd, _ := term.ReadPassword(0)
 		if len(pwd) == 0 {
-			fmt.Printf(red + "\nPassword can't be empty")
+			fmt.Fprintf(os.Stderr, red + "\nPassword can't be empty")
 		} else {
-			fmt.Printf("\nConfirm database password: ")
+			fmt.Fprintf(os.Stderr, "\nConfirm database password: ")
 			pwdc, _ := term.ReadPassword(0)
-			fmt.Println(def)
+			fmt.Fprintln(os.Stderr, def)
 			if bytes.Equal(pwd, pwdc) {
 				db.Pwd = pwd
 				return nil
 			}
-			fmt.Printf(red + "Passwords not the same")
+
+			fmt.Fprintf(os.Stderr, red + "Passwords not the same")
 		}
 		retryTimes--
 		if retryTimes > 0 {
-			fmt.Printf(", retry")
+			fmt.Fprintf(os.Stderr, ", retry")
 		}
-		fmt.Println(def)
+		fmt.Fprintln(os.Stderr, def)
 	}
 	return errWrongPassword
 }
