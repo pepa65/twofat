@@ -1,4 +1,4 @@
-module twofat
+module github.com/pepa65/twofat
 
 go 1.19
 
