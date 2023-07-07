@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.8.2"
+	version    = "0.8.3"
 	maxNameLen = 20
 	period     = 30
 )
