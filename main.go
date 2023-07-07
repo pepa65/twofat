@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.8.1"
+	version    = "0.8.2"
 	maxNameLen = 20
 	period     = 30
 )
@@ -745,8 +745,8 @@ func main() {
 
 func usage(err string) {
 	help := green + self + def + " v" + version + yellow + " - Manage TOTP data from CLI\n" +
-		def + "The CLI is interactive, the output colorful on Stderr. But SECRET can be piped\n" +
-		"in, and when Stdout is redirected, only pertinent information goes to Stdout.\n" +
+		def + "The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.\n" +
+		"But only pertinent plain text information goes to Stdout when it is redirected.\n" +
 		"* " + blue + "Repo" + def + ":       " + yellow + "github.com/pepa65/twofat" + def + " <pepa65@passchier.net>\n* " +
 		blue + "Data file" + def + ":  " + yellow + dbPath + def + "  (depends on the file name of the binary)\n* " +
 		blue + "Usage" + def + ":      " + yellow + self + def + " [" + green + "COMMAND" + def + "]\n" +
@@ -770,7 +770,7 @@ func usage(err string) {
 		green + "import  " + blue + "FILE" + def + "  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]\n" +
  		"   Import lines with OTPAUTH_URI from file " + blue + "FILE" + def + ".\n" +
  		"   If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " length check.\n" +
-		green + "export" + def + "  [" + blue + "FILE" + def + "]              Export all OTPAUTH_URI entries [to file " + blue + "FILE" + def + "].\n" +
+		green + "export" + def + "  [" + blue + "FILE" + def + "]              Export OTPAUTH_URI-format entries [to file " + blue + "FILE" + def + "].\n" +
 		green + "reveal" + def + " | " + green + "secret  " + blue + "NAME" + def + "       Show Secret of entry " + blue + "NAME" + def + ".\n" +
 		green + "clip" + def + " | " + green + "copy" + def + " | " + green + "cp  " + blue + "NAME" + def + "      Put Code of entry " + blue + "NAME" + def + " onto the clipboard.\n" +
 		green + "password" + def + " | " + green + "passwd" + def + " | " + green + "pw" + def + "      Change data file encryption password.\n" +

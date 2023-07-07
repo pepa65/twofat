@@ -1,6 +1,6 @@
 # twofat
 ## Manage TOTP data from CLI
-* **v0.8.1**
+* **v0.8.2**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
@@ -37,9 +37,9 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.8.1 - Manage TOTP data from CLI
-The CLI is interactive, the output colorful on Stderr. But SECRET can be piped
-in, and when Stdout is redirected, only pertinent information goes to Stdout.
+twofat v0.8.2 - Manage TOTP data from CLI
+The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.
+But only pertinent plain text information goes to Stdout when it is redirected.
 * Repo:       github.com/pepa65/twofat
 * Data file:  ~/.twofat.enc  (depends on the file name of the binary)
 * Usage:      twofat [COMMAND]
@@ -63,7 +63,7 @@ rename | move | mv  NAME  NEWNAME  [-f|--force]
 import  FILE  [-f|--force]
     Import lines with OTPAUTH_URI from file FILE.
     If -f/--force: existing NAME overwritten, no NAME length check.
-export  [FILE]              Export all OTPAUTH_URI entries [to file FILE].
+export  [FILE]              Export OTPAUTH_URI-format entries [to file FILE].
 reveal | secret  NAME       Show Secret of entry NAME.
 clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
 password | passwd | pw      Change data file encryption password.
