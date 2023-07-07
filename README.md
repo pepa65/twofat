@@ -80,4 +80,4 @@ Each line has a OTPAUTH_URI of the form: `otpauth://totp/NAME?secret=SECRET&digi
 ## Release management
 * Before `git commit` adjust the release number in `main.go` and `README.md`.
 * After `git commit` and before `git push`, tag the release: `git tag -a <release>`.
-* After `git commit` do: `goreleaser --clean`.
+* After `git push` do: `goreleaser --clean`.
