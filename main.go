@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.8.3"
+	version    = "0.8.4"
 	maxNameLen = 20
 	period     = 30
 )
@@ -746,7 +746,7 @@ func main() {
 func usage(err string) {
 	help := green + self + def + " v" + version + yellow + " - Manage TOTP data from CLI\n" +
 		def + "The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.\n" +
-		"But only pertinent plain text information goes to Stdout when it is redirected.\n" +
+		"Only pertinent plain text information goes to Stdout when it is redirected.\n" +
 		"* " + blue + "Repo" + def + ":       " + yellow + "github.com/pepa65/twofat" + def + " <pepa65@passchier.net>\n* " +
 		blue + "Data file" + def + ":  " + yellow + dbPath + def + "  (depends on the file name of the binary)\n* " +
 		blue + "Usage" + def + ":      " + yellow + self + def + " [" + green + "COMMAND" + def + "]\n" +
