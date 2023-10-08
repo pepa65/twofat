@@ -38,8 +38,13 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 ## Usage
 ```
 twofat v0.8.3 - Manage TOTP data from CLI
+<<<<<<< HEAD
 The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.
 But only pertinent plain text information goes to Stdout when it is redirected.
+=======
+The CLI is interactive, the output colorful on Stderr. But SECRET can be piped
+in, and when Stdout is redirected, only pertinent information goes to Stdout.
+>>>>>>> c8c0c7e (0.8.3)
 * Repo:       github.com/pepa65/twofat
 * Data file:  ~/.twofat.enc  (depends on the file name of the binary)
 * Usage:      twofat [COMMAND]
