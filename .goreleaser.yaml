@@ -13,7 +13,6 @@ builds:
       - darwin
       - windows
       - freebsd
-      - openbsd
       - plan9
 checksum:
   name_template: 'checksums.txt'
