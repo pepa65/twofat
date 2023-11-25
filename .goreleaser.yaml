@@ -1,5 +1,5 @@
 upx:
-  - enabled: true
+  - enabled: false
     compress: best
 
 archives:
@@ -13,6 +13,7 @@ builds:
       - darwin
       - windows
       - freebsd
+      - openbsd
       - plan9
 checksum:
   name_template: 'checksums.txt'
