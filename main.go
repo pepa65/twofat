@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.8.12"
+	version    = "0.9.0"
 	maxNameLen = 20
 	period     = 30
 )
@@ -447,8 +447,8 @@ func exportEntries(filename string) {
 
 	if filename == "" {
 		for name := range db.Entries {
-			line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%d",
-				url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits)
+			line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%d&issuer=%s",
+				url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits, url.PathEscape(name))
 			fmt.Println(line)
 		}
 		return
