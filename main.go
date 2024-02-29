@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.9.0"
+	version    = "0.10.0"
 	maxNameLen = 20
 	period     = 30
 )
@@ -100,6 +100,12 @@ func checkBase32(secret string) string {
 func addEntry(name, secret string) {
 	if !forceChange && len([]rune(name)) > maxNameLen {
 		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
+	}
+
+	// NAME should not have a colon or percent sign
+	if strings.Contains(name, ":") || strings.Contains(name, "%") {
+		fmt.Fprintln(os.Stderr, red + "Entry '" + name + "' contains ':' or '%'")
+		return
 	}
 
 	db, err := readDb(redirected)
@@ -290,6 +296,12 @@ func renameEntry(name string, nname string) {
 
 	if !forceChange && len([]rune(nname)) > maxNameLen {
 		exitOnError(errr, "NEWNAME longer than "+fmt.Sprint(maxNameLen))
+	}
+
+	// NEWNAME should not have a colon or percent sign
+	if strings.Contains(nname, ":") || strings.Contains(nname, "%") {
+		fmt.Fprintln(os.Stderr, red + "Entry '" + nname + "' contains ':' or '%'")
+		return
 	}
 
 	db, err := readDb(redirected)
@@ -509,6 +521,12 @@ func importEntries(filename string) {
 			} else {
 				exitOnError(errr, fmt.Sprintf("NAME longer than %d on line %d", maxNameLen, n))
 			}
+		}
+
+		// NAME should not have a colon or percent sign
+		if strings.Contains(name, ":") || strings.Contains(name, "%") {
+			fmt.Fprintln(os.Stderr, red + "Entry '" + name + "' contains ':' or '%'")
+			return
 		}
 
 		_, found := db.Entries[name]

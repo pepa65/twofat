@@ -1,6 +1,6 @@
 # twofat
 ## Manage TOTP data from CLI
-* **v0.9.0**
+* **v0.10.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
@@ -37,7 +37,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.9.0 - Manage TOTP data from CLI
+twofat v0.10.0 - Manage TOTP data from CLI
 The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.
 Only pertinent plain text information goes to Stdout when it is redirected.
 * Repo:       github.com/pepa65/twofat
@@ -77,9 +77,9 @@ Each exported line has a OTPAUTH_URI of the form:
 `otpauth://totp/NAME?secret=SECRET&digits=LENGTH&issuer=NAME`
 (the capitalized parts are variable parameters: `NAME`, `SECRET`, `LENGTH`).
 
-* The `NAME` should not have a `:` colon or contain `%3A`.
+* The `NAME` should not have a colon `:` or `%` (messes with URL conversion).
   (`NAME` could be `ISSUER:ACCOUNTNAME`, but `twofat` uses the full `NAME` for the `issuer` parameter.)
-* The `SECRET` is the base32 RFC3548 seed for the OTPs.
+* The `SECRET` is the base32 RFC3548 seed (without the padding!) for the OTPs.
 * The `LENGTH` is almost always `6`, but can be set to `8` in `twofat`.
 * The parameter `period` is fixed to `30` (the default) in almost all apps, so given.
 * Most all apps seem to use `SHA1` (the default) for the `algorithm` parameter (`twofat` as well).
