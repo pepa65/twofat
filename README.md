@@ -1,6 +1,6 @@
 # twofat
-## Manage TOTP data from CLI
-* **v0.10.0**
+## Manage TOTPs from CLI
+* **v0.11.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
@@ -8,8 +8,8 @@
 
 ### Features
 * Data saved with AES-GCM encrypt in ~/.twofat.enc, password changeable.
-* Display codes of names matching regex, which auto-refresh.
-* Add, rename, delete entry, reveal secret, copy code to clipboard.
+* Display TOTPs of names matching regex, which auto-refresh.
+* Add, rename, delete entry, reveal secret, copy TOTP to clipboard.
 * Import & export entries from & to standardized OTPAUTH_URI file.
 * Displays well in 80-colums (or more) terminals. NAME display truncated to 20.
 
@@ -37,24 +37,25 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v0.10.0 - Manage TOTP data from CLI
+twofat v0.11.0 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.
 Only pertinent plain text information goes to Stdout when it is redirected.
-* Repo:       github.com/pepa65/twofat
+* Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
 * Data file:  ~/.twofat.enc  (depends on the file name of the binary)
 * Usage:      twofat [COMMAND]
   COMMAND:
 [ show | view ]  [REGEX]
-    Display all Codes with Names [matching REGEX] (the command is optional).
+    Display all TOTPs with Names [matching REGEX] (the command is optional).
 list | ls  [REGEX]
     List all Names [with Names matching REGEX].
-add | insert | entry  NAME  [-8]  [-f|--force]  [SECRET]
+add | insert | entry  NAME  [-5|-8]  [-f|--force]  [SECRET]
     Add a new entry NAME with SECRET (queried when not given).
-    When -8 is given, Code LENGTH is 8 digits, otherwise it is 6.
+    When -5 is given, TOTP length is 5 digits (for Steam),
+    when -8 is given, TOTP length is 8 digits, otherwise it is 6.
     If -f/--force: existing NAME overwritten, no NAME length check.
-totp | temp  [-8]  [SECRET]
-    Show the Code for SECRET (queried when not given).
-    When -8 is given, Code LENGTH is 8 digits, otherwise it is 6.
+totp | temp  [-5|-8]  [SECRET]
+    Show the TOTP for SECRET (queried when not given).
+    When -5/-8 is given, TOTP length is 5 or 8 digits, otherwise it is 6.
     (The data file is not queried nor written to.)
 delete | remove | rm  NAME  [-f|--force]
     Delete entry NAME. If -f/--force: no confirmation asked.
@@ -65,7 +66,7 @@ import  FILE  [-f|--force]
     If -f/--force: existing NAME overwritten, no NAME length check.
 export  [FILE]              Export OTPAUTH_URI-format entries [to file FILE].
 reveal | secret  NAME       Show Secret of entry NAME.
-clip | copy | cp  NAME      Put Code of entry NAME onto the clipboard.
+clip | copy | cp  NAME      Put TOTP of entry NAME onto the clipboard.
 password | passwd | pw      Change data file encryption password.
 version | --version | -V    Show version.
 help | --help | -h          Show this help text.
@@ -80,7 +81,7 @@ Each exported line has a OTPAUTH_URI of the form:
 * The `NAME` should not have a colon `:` or `%` (messes with URL conversion).
   (`NAME` could be `ISSUER:ACCOUNTNAME`, but `twofat` uses the full `NAME` for the `issuer` parameter.)
 * The `SECRET` is the base32 RFC3548 seed (without the padding!) for the OTPs.
-* The `LENGTH` is almost always `6`, but can be set to `8` in `twofat`.
+* The `LENGTH` is almost always `6`, but can be set to `5` (for Steam) or `8` in `twofat`.
 * The parameter `period` is fixed to `30` (the default) in almost all apps, so given.
 * Most all apps seem to use `SHA1` (the default) for the `algorithm` parameter (`twofat` as well).
 * The `issuer` is set to `NAME` in `twofat`.

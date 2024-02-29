@@ -7,10 +7,10 @@ import (
 	"encoding/base32"
 	"errors"
 	"fmt"
-	"os"
 	"net/url"
-	"regexp"
+	"os"
 	"os/signal"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,7 +22,7 @@ import (
 )
 
 const (
-	version    = "0.10.0"
+	version    = "0.11.0"
 	maxNameLen = 20
 	period     = 30
 )
@@ -30,6 +30,7 @@ const (
 var (
 	errr        = errors.New("Error")
 	forceChange = false
+	digits5     = false
 	digits8     = false
 	redirected  = true
 	interrupt   = make(chan os.Signal)
@@ -90,7 +91,7 @@ func checkBase32(secret string) string {
 
 	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 	if e != nil {
-		fmt.Fprintln(os.Stderr, red + "Invalid base32" + def + " (Valid characters: 2-7 and A-Z; ignored: spaces and dashes)")
+		fmt.Fprintln(os.Stderr, red+"Invalid base32"+def+" (Valid characters: 2-7 and A-Z; ignored: spaces and dashes)")
 		return ""
 	}
 
@@ -104,7 +105,7 @@ func addEntry(name, secret string) {
 
 	// NAME should not have a colon or percent sign
 	if strings.Contains(name, ":") || strings.Contains(name, "%") {
-		fmt.Fprintln(os.Stderr, red + "Entry '" + name + "' contains ':' or '%'")
+		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' contains ':' or '%'")
 		return
 	}
 
@@ -114,11 +115,11 @@ func addEntry(name, secret string) {
 	action := "added"
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Fprintf(os.Stderr, yellow + "Entry '" + name + "' exists, confirm change [y/N] ")
+			fmt.Fprintf(os.Stderr, yellow+"Entry '"+name+"' exists, confirm change [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadByte()
 			if cfm != 'y' {
-				fmt.Fprintln(os.Stderr, red + "Entry not changed")
+				fmt.Fprintln(os.Stderr, red+"Entry not changed")
 				return
 			}
 
@@ -130,7 +131,7 @@ func addEntry(name, secret string) {
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
 	for secret == "" {
-		fmt.Fprintf(os.Stderr, yellow + "Enter base32 Secret" + def + " [empty field to cancel]: ")
+		fmt.Fprintf(os.Stderr, yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
 		if secret == "" {
@@ -139,11 +140,14 @@ func addEntry(name, secret string) {
 		secret = checkBase32(secret)
 	}
 	if secret == "" {
-		fmt.Fprintln(os.Stderr, cls + red + "Adding entry '" + name + "' cancelled")
+		fmt.Fprintln(os.Stderr, cls+red+"Adding entry '"+name+"' cancelled")
 		return
 	}
 
 	digits := 6
+	if digits5 {
+		digits = 5
+	}
 	if digits8 {
 		digits = 8
 	}
@@ -156,18 +160,18 @@ func addEntry(name, secret string) {
 
 	fmt.Fprintf(os.Stderr, cls+green+" Entry '"+yellow+name+green+" %s\n", action)
 	if redirected {
-		code := oneTimePassword(db.Entries[name].Secret)
-		code = code[len(code)-db.Entries[name].Digits:]
-		fmt.Println(code)
+		totp := oneTimePassword(db.Entries[name].Secret)
+		totp = totp[len(totp)-db.Entries[name].Digits:]
+		fmt.Println(totp)
 		return
 	}
 
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
-		code := oneTimePassword(db.Entries[name].Secret)
-		code = code[len(code)-db.Entries[name].Digits:]
+		totp := oneTimePassword(db.Entries[name].Secret)
+		totp = totp[len(totp)-db.Entries[name].Digits:]
 		left := period - time.Now().Unix()%period
-		fmt.Fprintf(os.Stderr, blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+
+		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+yellow+totp+blue+"  Validity:"+yellow+
 			" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
 		go func() {
 			<-interrupt
@@ -178,12 +182,12 @@ func addEntry(name, secret string) {
 	}
 }
 
-func showTotp(secret string) {
+func showSingleTotp(secret string) {
 	secret = checkBase32(secret)
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
 	for secret == "" {
-		fmt.Fprintf(os.Stderr, yellow + "Enter base32 Secret" + def + " [empty field to cancel]: ")
+		fmt.Fprintf(os.Stderr, yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
 		secret, _ = reader.ReadString('\n')
 		secret = strings.TrimSuffix(secret, "\n")
 		if secret == "" {
@@ -196,22 +200,25 @@ func showTotp(secret string) {
 	}
 
 	digits := 6
+	if digits5 {
+		digits = 5
+	}
 	if digits8 {
 		digits = 8
 	}
 	if redirected {
-		code := oneTimePassword(strings.ToUpper(secret))
-		code = code[len(code)-digits:]
-		fmt.Println(code)
+		totp := oneTimePassword(strings.ToUpper(secret))
+		totp = totp[len(totp)-digits:]
+		fmt.Println(totp)
 		return
 	}
 
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
-		code := oneTimePassword(strings.ToUpper(secret))
-		code = code[len(code)-digits:]
+		totp := oneTimePassword(strings.ToUpper(secret))
+		totp = totp[len(totp)-digits:]
 		left := period - time.Now().Unix()%period
-		fmt.Fprintf(os.Stderr, blue+"\r Code: "+yellow+code+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
+		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+yellow+totp+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
 		go func() {
 			<-interrupt
 			fmt.Fprintf(os.Stderr, cls)
@@ -227,11 +234,11 @@ func deleteEntry(name string) {
 
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
-			fmt.Fprintf(os.Stderr, yellow + "Sure to delete entry '" + name + "'? [y/N] ")
+			fmt.Fprintf(os.Stderr, yellow+"Sure to delete entry '"+name+"'? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadByte()
 			if cfm != 'y' {
-				fmt.Fprintln(os.Stderr, red + "Entry not deleted")
+				fmt.Fprintln(os.Stderr, red+"Entry not deleted")
 				return
 			}
 		}
@@ -240,9 +247,9 @@ func deleteEntry(name string) {
 		err = saveDb(&db)
 		exitOnError(err, "Failure saving data file, entry not deleted")
 
-		fmt.Fprintln(os.Stderr, green + "Entry '" + name + "' deleted")
+		fmt.Fprintln(os.Stderr, green+"Entry '"+name+"' deleted")
 	} else {
-		fmt.Fprintln(os.Stderr, red + "Entry '" + name + "' not found")
+		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' not found")
 	}
 }
 
@@ -250,14 +257,14 @@ func changePassword() {
 	db, err := readDb(redirected)
 	exitOnError(err, "Failure opening data file for changing password")
 
-	fmt.Fprintln(os.Stderr, green + "Changing password")
+	fmt.Fprintln(os.Stderr, green+"Changing password")
 	err = initPassword(&db)
 	exitOnError(err, "Failure changing password")
 
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving data file, password not changed")
 
-	fmt.Fprintln(os.Stderr, green + "Password change successful")
+	fmt.Fprintln(os.Stderr, green+"Password change successful")
 }
 
 func revealSecret(name string) {
@@ -266,7 +273,7 @@ func revealSecret(name string) {
 
 	secret := db.Entries[name].Secret
 	if secret == "" {
-		fmt.Fprintln(os.Stderr, red + "Entry '" + name + "' not found")
+		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' not found")
 		return
 	}
 
@@ -277,7 +284,7 @@ func revealSecret(name string) {
 
 	fmt.Fprintf(os.Stderr, "%s%s: %s%s%s\n", blue, name, yellow, secret, def)
 	fmt.Fprintf(os.Stderr, "otpauth://totp/%s?secret=%s&digits=%d\n", url.PathEscape(name), secret, db.Entries[name].Digits)
-	fmt.Fprintf(os.Stderr, def + "[Press "+green+"Ctrl-C"+def+" to exit] ")
+	fmt.Fprintf(os.Stderr, def+"[Press "+green+"Ctrl-C"+def+" to exit] ")
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
 		go func() {
@@ -300,7 +307,7 @@ func renameEntry(name string, nname string) {
 
 	// NEWNAME should not have a colon or percent sign
 	if strings.Contains(nname, ":") || strings.Contains(nname, "%") {
-		fmt.Fprintln(os.Stderr, red + "Entry '" + nname + "' contains ':' or '%'")
+		fmt.Fprintln(os.Stderr, red+"Entry '"+nname+"' contains ':' or '%'")
 		return
 	}
 
@@ -321,28 +328,28 @@ func renameEntry(name string, nname string) {
 	err = saveDb(&db)
 	exitOnError(err, "Failure saving data file, entry not renamed")
 
-	fmt.Fprintln(os.Stderr, green + "Entry '" + name + "' renamed to '" + nname + "'")
+	fmt.Fprintln(os.Stderr, green+"Entry '"+name+"' renamed to '"+nname+"'")
 }
 
-func clipCode(name string) {
+func clipTOTP(name string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for copying Code to clipboard")
+	exitOnError(err, "Failure opening data file for copying TOTP to clipboard")
 
 	if secret := db.Entries[name].Secret; secret == "" {
-		fmt.Fprintln(os.Stderr, red + "Entry '" + name + "' not found")
+		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' not found")
 		return
 	}
 
-	code := oneTimePassword(db.Entries[name].Secret)
-	code = code[len(code)-db.Entries[name].Digits:]
-	clipboard.WriteAll(code)
+	totp := oneTimePassword(db.Entries[name].Secret)
+	totp = totp[len(totp)-db.Entries[name].Digits:]
+	clipboard.WriteAll(totp)
 	left := period - time.Now().Unix()%period
-	fmt.Fprintf(os.Stderr, green+"Code of "+yellow+"'"+name+"'"+green+" copied to clipboard, valid for"+yellow+" %d "+green+"s\n", left)
+	fmt.Fprintf(os.Stderr, green+"TOTP of "+yellow+"'"+name+"'"+green+" copied to clipboard, valid for"+yellow+" %d "+green+"s\n", left)
 }
 
-func showCodes(regex string) {
+func showTotps(regex string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for showing Codes")
+	exitOnError(err, "Failure opening data file for showing TOTPs")
 
 	// Match regex and sort on name
 	var names []string
@@ -353,21 +360,21 @@ func showCodes(regex string) {
 	}
 	if redirected {
 		for _, name := range names {
-			code := oneTimePassword(db.Entries[name].Secret)
+			totp := oneTimePassword(db.Entries[name].Secret)
 			tag := name
 			if len(name) > maxNameLen {
 				tag = name[:maxNameLen]
 			}
-			fmt.Printf("%v %v\n", code[len(code)-db.Entries[name].Digits:], tag)
+			fmt.Printf("%v %v\n", totp[len(totp)-db.Entries[name].Digits:], tag)
 		}
 		return
 	}
 
 	nn := len(names)
 	if nn == 0 {
-		fmt.Fprintf(os.Stderr, red + "No entries")
+		fmt.Fprintf(os.Stderr, red+"No entries")
 		if regex != "" {
-			fmt.Fprintln(os.Stderr, " matching Regex '" + regex + "'")
+			fmt.Fprintln(os.Stderr, " matching Regex '"+regex+"'")
 		}
 		fmt.Fprintln(os.Stderr, def)
 		return
@@ -388,20 +395,20 @@ func showCodes(regex string) {
 
 	fmtstr := "%s %-" + fmt.Sprint(maxNameLen) + "s"
 	for {
-		fmt.Fprintf(os.Stderr, cls + blue + "   Code - Name")
+		fmt.Fprintf(os.Stderr, cls+blue+"   TOTP - Name")
 		for i := 1; i < cols && i < nn; i++ {
-			fmt.Fprintf(os.Stderr, strings.Repeat(" ", maxNameLen-1)+"Code - Name")
+			fmt.Fprintf(os.Stderr, strings.Repeat(" ", maxNameLen-1)+"TOTP - Name")
 		}
 		fmt.Fprintln(os.Stderr)
 		n := 0
 		for _, name := range names {
-			code := oneTimePassword(db.Entries[name].Secret)
-			code = fmt.Sprintf("%8v", code[len(code)-db.Entries[name].Digits:])
+			totp := oneTimePassword(db.Entries[name].Secret)
+			totp = fmt.Sprintf("%8v", totp[len(totp)-db.Entries[name].Digits:])
 			tag := name
 			if len(name) > maxNameLen {
 				tag = name[:maxNameLen]
 			}
-			fmt.Fprintf(os.Stderr, fmtstr, green+code+def, tag)
+			fmt.Fprintf(os.Stderr, fmtstr, green+totp+def, tag)
 			n += 1
 			if n%cols == 0 {
 				fmt.Fprintln(os.Stderr)
@@ -439,9 +446,9 @@ func showNames(regex string) {
 		}
 	}
 	if len(names) == 0 && !redirected {
-		fmt.Fprintf(os.Stderr, red + "No entries")
+		fmt.Fprintf(os.Stderr, red+"No entries")
 		if regex != "" {
-			fmt.Fprintf(os.Stderr, " matching Regex '" + regex + "'")
+			fmt.Fprintf(os.Stderr, " matching Regex '"+regex+"'")
 		}
 		fmt.Fprintln(os.Stderr, def)
 		return
@@ -480,7 +487,7 @@ func exportEntries(filename string) {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "%sFile exported:%s %s\n",green, def, filename)
+	fmt.Fprintf(os.Stderr, "%sFile exported:%s %s\n", green, def, filename)
 }
 
 func importEntries(filename string) {
@@ -525,7 +532,7 @@ func importEntries(filename string) {
 
 		// NAME should not have a colon or percent sign
 		if strings.Contains(name, ":") || strings.Contains(name, "%") {
-			fmt.Fprintln(os.Stderr, red + "Entry '" + name + "' contains ':' or '%'")
+			fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' contains ':' or '%'")
 			return
 		}
 
@@ -550,14 +557,14 @@ func importEntries(filename string) {
 
 			case "digits":
 				if len(value) > 1 {
-					exitOnError(errr, "Multiple Code LENGTHs (key 'digits') on line "+ns)
+					exitOnError(errr, "Multiple TOTP LENGTHs (key 'digits') on line "+ns)
 				}
 
 				digits, err = strconv.Atoi(value[0])
-				exitOnError(err, "Code LENGTHs (key 'digits') not an integer")
+				exitOnError(err, "TOTP LENGTHs (key 'digits') not an integer")
 
-				if digits != 6 && digits != 8 {
-					exitOnError(errr, "Code LENGTH (key 'digits') on line "+ns+"not 6/8: "+value[0])
+				if digits != 5 && digits != 6 && digits != 8 {
+					exitOnError(errr, "TOTP LENGTH (key 'digits') on line "+ns+"not 5/6/8: "+value[0])
 				}
 
 			default:
@@ -603,15 +610,15 @@ func main() {
 			case "help", "--help", "-h":
 				usage("")
 			case "version", "--version", "-V":
-				fmt.Fprintln(os.Stderr, self + " version " + version)
+				fmt.Fprintln(os.Stderr, self+" version "+version)
 				return
 
 			case "rename", "move", "mv":
 				cmd = "m" // NAME NEWNAME -f/--force
 			case "add", "insert", "entry":
-				cmd = "a" // NAME SECRET -8 -f/--force
+				cmd = "a" // NAME SECRET -5 -8 -f/--force
 			case "totp", "temp":
-				cmd = "t" // SECRET -8
+				cmd = "t" // SECRET -5 -8
 			case "reveal", "secret":
 				cmd = "r" // NAME
 			case "clip", "copy", "cp":
@@ -693,6 +700,10 @@ func main() {
 				forceChange = true
 				continue
 			}
+			if !ddash && arg == "-5" {
+				digits5 = true
+				continue
+			}
 			if !ddash && arg == "-8" {
 				digits8 = true
 				continue
@@ -706,6 +717,10 @@ func main() {
 				name = arg
 			}
 		case "t":
+			if !ddash && arg == "-5" {
+				digits5 = true
+				continue
+			}
 			if !ddash && arg == "-8" {
 				digits8 = true
 				continue
@@ -719,7 +734,7 @@ func main() {
 	// All arguments have been parsed, check
 	switch cmd {
 	case "", "s":
-		showCodes(regex)
+		showTotps(regex)
 	case "l":
 		showNames(regex)
 	case "a":
@@ -728,7 +743,7 @@ func main() {
 		}
 		addEntry(name, secret)
 	case "t":
-		showTotp(secret)
+		showSingleTotp(secret)
 	case "m":
 		if name == "" || nname == "" {
 			usage("'rename' command needs NAME and NEWNAME as arguments")
@@ -743,7 +758,7 @@ func main() {
 		if name == "" {
 			usage("'clip' command needs NAME as argument")
 		}
-		clipCode(name)
+		clipTOTP(name)
 	case "d":
 		if name == "" {
 			usage("'delete' command needs NAME as argument")
@@ -762,7 +777,7 @@ func main() {
 }
 
 func usage(err string) {
-	help := green + self + def + " v" + version + yellow + " - Manage TOTP data from CLI\n" +
+	help := green + self + def + " v" + version + yellow + " - Manage TOTPs from CLI\n" +
 		def + "The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.\n" +
 		"Only pertinent plain text information goes to Stdout when it is redirected.\n" +
 		"* " + blue + "Repo" + def + ":       " + yellow + "github.com/pepa65/twofat" + def + " <pepa65@passchier.net>\n* " +
@@ -770,33 +785,34 @@ func usage(err string) {
 		blue + "Usage" + def + ":      " + yellow + self + def + " [" + green + "COMMAND" + def + "]\n" +
 		green + "  COMMAND" + def + ":\n" +
 		"[ " + green + "show" + def + " | " + green + "view" + def + " ]  [" + blue + "REGEX" + def + "]\n" +
-		"    Display all Codes with Names [matching " + blue + "REGEX" + def + "] (the command is optional).\n" +
+		"    Display all TOTPs with Names [matching " + blue + "REGEX" + def + "] (the command is optional).\n" +
 		green + "list" + def + " | " + green + "ls" + def + "  [" + blue + "REGEX" + def + "]\n" +
 		"    List all Names [with Names matching " + blue + "REGEX" + def + "].\n" +
-		green + "add" + def + " | " + green + "insert" + def + " | " + green + "entry  " + blue + "NAME" + def + "  [" + yellow + "-8" + def + "]  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]  [" + blue + "SECRET" + def + "]\n" +
- 		"   Add a new entry " + blue + "NAME" + def + " with " + blue + "SECRET" + def + " (queried when not given).\n" +
- 		"   When " + yellow + "-8" + def + " is given, Code length is 8 digits, otherwise it is 6.\n" +
- 		"   If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " length check.\n" +
-		green + "totp" + def + " | " + green + "temp" + def + "  [" + yellow + "-8" + def + "]  [" + blue + "SECRET" + def + "]\n" +
- 		"   Show the Code for " + blue + "SECRET" + def + " (queried when not given).\n" +
- 		"   When " + yellow + "-8" + def + " is given, Code length is 8 digits, otherwise it is 6.\n" +
- 		"   (The data file is not queried nor written to.)\n" +
+		green + "add" + def + " | " + green + "insert" + def + " | " + green + "entry  " + blue + "NAME" + def + "  [" + yellow + "-5" + def + "/" + yellow + "-8" + def + "]  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]  [" + blue + "SECRET" + def + "]\n" +
+		"    Add a new entry " + blue + "NAME" + def + " with " + blue + "SECRET" + def + " (queried when not given).\n" +
+		"    When " + yellow + "-5" + def + " is given, TOTP length is 5 digits (for Steam),\n" +
+		"    when " + yellow + "-8" + def + " is given, TOTP length is 8 digits, otherwise it is 6.\n" +
+		"    If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " length check.\n" +
+		green + "totp" + def + " | " + green + "temp" + def + "  [" + yellow + "-5" + def + "/" + yellow + "-8" + def + "]  [" + blue + "SECRET" + def + "]\n" +
+		"    Show the TOTP for " + blue + "SECRET" + def + " (queried when not given).\n" +
+		"    When " + yellow + "-5" + def + "/" + yellow + "-8" + def + " is given, TOTP length is 5 or 8 digits, otherwise it is 6.\n" +
+		"    (The data file is not queried nor written to.)\n" +
 		green + "delete" + def + " | " + green + "remove" + def + " | " + green + "rm  " + blue + "NAME" + def + "  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]\n" +
- 		"   Delete entry " + blue + "NAME" + def + ". If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": no confirmation asked.\n" +
+		"    Delete entry " + blue + "NAME" + def + ". If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": no confirmation asked.\n" +
 		green + "rename" + def + " | " + green + "move" + def + " | " + green + "mv  " + blue + "NAME  NEWNAME" + def + "  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]\n" +
- 		"   Rename entry " + blue + "NAME" + def + " to " + blue + "NEWNAME" + def + ", if " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": no length checks.\n" +
+		"    Rename entry " + blue + "NAME" + def + " to " + blue + "NEWNAME" + def + ", if " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": no length checks.\n" +
 		green + "import  " + blue + "FILE" + def + "  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]\n" +
- 		"   Import lines with OTPAUTH_URI from file " + blue + "FILE" + def + ".\n" +
- 		"   If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " length check.\n" +
+		"    Import lines with OTPAUTH_URI from file " + blue + "FILE" + def + ".\n" +
+		"    If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " length check.\n" +
 		green + "export" + def + "  [" + blue + "FILE" + def + "]              Export OTPAUTH_URI-format entries [to file " + blue + "FILE" + def + "].\n" +
 		green + "reveal" + def + " | " + green + "secret  " + blue + "NAME" + def + "       Show Secret of entry " + blue + "NAME" + def + ".\n" +
-		green + "clip" + def + " | " + green + "copy" + def + " | " + green + "cp  " + blue + "NAME" + def + "      Put Code of entry " + blue + "NAME" + def + " onto the clipboard.\n" +
+		green + "clip" + def + " | " + green + "copy" + def + " | " + green + "cp  " + blue + "NAME" + def + "      Put TOTP of entry " + blue + "NAME" + def + " onto the clipboard.\n" +
 		green + "password" + def + " | " + green + "passwd" + def + " | " + green + "pw" + def + "      Change data file encryption password.\n" +
 		green + "version" + def + " | " + green + "--version" + def + " | " + green + "-V" + def + "    Show version.\n" +
 		green + "help" + def + " | " + green + "--help" + def + " | " + green + "-h" + def + "          Show this help text."
 	fmt.Fprintln(os.Stderr, help)
 	if err != "" {
-		fmt.Fprintln(os.Stderr, red + "Abort: " + err)
+		fmt.Fprintln(os.Stderr, red+"Abort: "+err)
 		os.Exit(5)
 	}
 	os.Exit(0)

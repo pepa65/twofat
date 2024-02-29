@@ -80,13 +80,13 @@ func readDb(redirected bool) (dbase, error) {
 		encdata := dbdata[nonceSize:]
 		exec.Command("reset").Run()
 		if !redirected {
-			fmt.Fprintln(os.Stderr, "Database: " + blue + dbPath + def)
+			fmt.Fprintln(os.Stderr, "Database: "+blue+dbPath+def)
 		}
 		if !term.IsTerminal(0) { // Piped in
 			db.Pwd, _ = io.ReadAll(os.Stdin)
 		}
 		if len(db.Pwd) == 0 {
-			fmt.Fprintf(os.Stderr, yellow + "Enter database password: " + def)
+			fmt.Fprintf(os.Stderr, yellow+"Enter database password: "+def)
 			db.Pwd, _ = term.ReadPassword(0)
 			fmt.Fprintln(os.Stderr)
 		}
@@ -117,7 +117,7 @@ func readDb(redirected bool) (dbase, error) {
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Fprintln(os.Stderr, green + "Initializing database file" + def)
+	fmt.Fprintln(os.Stderr, green+"Initializing database file"+def)
 	initPassword(&db)
 	db.Entries = make(map[string]entry)
 	saveDb(&db)
@@ -163,12 +163,12 @@ func saveDb(db *dbase) error {
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
 	exec.Command("reset").Run()
-	fmt.Fprintln(os.Stderr, "Database: " + blue + dbPath + def)
+	fmt.Fprintln(os.Stderr, "Database: "+blue+dbPath+def)
 	for retryTimes > 0 {
-		fmt.Fprintf(os.Stderr, yellow + "New database password: ")
+		fmt.Fprintf(os.Stderr, yellow+"New database password: ")
 		pwd, _ := term.ReadPassword(0)
 		if len(pwd) == 0 {
-			fmt.Fprintf(os.Stderr, red + "\nPassword can't be empty")
+			fmt.Fprintf(os.Stderr, red+"\nPassword can't be empty")
 		} else {
 			fmt.Fprintf(os.Stderr, "\nConfirm database password: ")
 			pwdc, _ := term.ReadPassword(0)
@@ -178,7 +178,7 @@ func initPassword(db *dbase) error {
 				return nil
 			}
 
-			fmt.Fprintf(os.Stderr, red + "Passwords not the same")
+			fmt.Fprintf(os.Stderr, red+"Passwords not the same")
 		}
 		retryTimes--
 		if retryTimes > 0 {
