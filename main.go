@@ -4,6 +4,8 @@ import (
 	"bufio"
 	"crypto/hmac"
 	"crypto/sha1"
+	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/base32"
 	"errors"
 	"fmt"
@@ -12,7 +14,6 @@ import (
 	"os/signal"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -22,7 +23,7 @@ import (
 )
 
 const (
-	version    = "0.11.0"
+	version    = "1.0.0"
 	maxNameLen = 20
 	period     = 30
 )
@@ -30,8 +31,6 @@ const (
 var (
 	errr        = errors.New("Error")
 	forceChange = false
-	digits5     = false
-	digits8     = false
 	redirected  = true
 	interrupt   = make(chan os.Signal)
 )
@@ -57,34 +56,47 @@ func toUint32(bytes []byte) uint32 {
 	return uint32(bytes[0])<<24 + uint32(bytes[1])<<16 + uint32(bytes[2])<<8 + uint32(bytes[3])
 }
 
-func oneTimePassword(keyStr string) string {
-	byteSecret, err := base32.StdEncoding.WithPadding(base32.NoPadding).
-		DecodeString(keyStr)
+func oneTimePassword(secret, size, algorithm string) string {
+	byteSecret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(2)
 	}
+
 	value := toBytes(time.Now().Unix() / period)
+	var hash []byte
+	switch algorithm {
+		case "SHA1": // Sign the value using HMAC-SHA1
+			hmacSha1 := hmac.New(sha1.New, byteSecret)
+			hmacSha1.Write(value)
+			hash = hmacSha1.Sum(nil)
+		case "SHA256": // Sign the value using HMAC-SHA256
+			hmacSha256 := hmac.New(sha256.New, byteSecret)
+			hmacSha256.Write(value)
+			hash = hmacSha256.Sum(nil)
+		case "SHA512": // Sign the value using HMAC-SHA512
+			hmacSha512 := hmac.New(sha512.New, byteSecret)
+			hmacSha512.Write(value)
+			hash = hmacSha512.Sum(nil)
+		default:
+			exitOnError(errr, "Unsupported algorithm: "+algorithm)
 
-	// Sign the value using HMAC-SHA1
-	hmacSha1 := hmac.New(sha1.New, byteSecret)
-	hmacSha1.Write(value)
-	hash := hmacSha1.Sum(nil)
+	}
 	offset := hash[len(hash)-1] & 0x0F
-
 	// Get 32-bit chunk from the hash starting at offset
-	hashParts := hash[offset : offset+4]
-
+	hmacParts := hash[offset:offset+4]
 	// Ignore most significant bit 0x80 (RFC4226)
-	hashParts[0] = hashParts[0] & 0x7F
-	number := toUint32(hashParts)
-	return fmt.Sprintf("%08d", number)
+	hmacParts[0] = hmacParts[0] & 0x7F
+	totp := fmt.Sprintf("%08d", toUint32(hmacParts) % 100000000)
+	l := int(size[0]) - 48
+	return totp[8-l:]
 }
 
 func checkBase32(secret string) string {
 	secret = strings.ToUpper(secret)
 	secret = strings.ReplaceAll(secret, "-", "")
 	secret = strings.ReplaceAll(secret, " ", "")
+	secret = strings.ReplaceAll(secret, "=", "")
 	if secret == "" {
 		return ""
 	}
@@ -98,7 +110,7 @@ func checkBase32(secret string) string {
 	return secret
 }
 
-func addEntry(name, secret string) {
+func addEntry(name, secret, size, algorithm string) {
 	if !forceChange && len([]rune(name)) > maxNameLen {
 		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
 	}
@@ -110,7 +122,7 @@ func addEntry(name, secret string) {
 	}
 
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for adding entry")
+	exitOnError(err, "Failure opening datafile for adding entry")
 
 	action := "added"
 	if _, found := db.Entries[name]; found {
@@ -144,32 +156,24 @@ func addEntry(name, secret string) {
 		return
 	}
 
-	digits := 6
-	if digits5 {
-		digits = 5
-	}
-	if digits8 {
-		digits = 8
-	}
 	db.Entries[name] = entry{
-		Secret: strings.ToUpper(secret),
-		Digits: digits,
+		Secret:    secret,
+		Digits:    size,
+		Algorithm: algorithm,
 	}
 	err = saveDb(&db)
-	exitOnError(err, cls+"Failure saving data file, entry not "+action)
+	exitOnError(err, cls+"Failure saving datafile, entry not "+action)
 
 	fmt.Fprintf(os.Stderr, cls+green+" Entry '"+yellow+name+green+" %s\n", action)
 	if redirected {
-		totp := oneTimePassword(db.Entries[name].Secret)
-		totp = totp[len(totp)-db.Entries[name].Digits:]
+		totp := oneTimePassword(secret, size, algorithm)
 		fmt.Println(totp)
 		return
 	}
 
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
-		totp := oneTimePassword(db.Entries[name].Secret)
-		totp = totp[len(totp)-db.Entries[name].Digits:]
+		totp := oneTimePassword(secret, size, algorithm)
 		left := period - time.Now().Unix()%period
 		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+yellow+totp+blue+"  Validity:"+yellow+
 			" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
@@ -182,7 +186,7 @@ func addEntry(name, secret string) {
 	}
 }
 
-func showSingleTotp(secret string) {
+func showSingleTotp(secret, size, algorithm string) {
 	secret = checkBase32(secret)
 	// If SECRET not supplied or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
@@ -199,24 +203,15 @@ func showSingleTotp(secret string) {
 		return
 	}
 
-	digits := 6
-	if digits5 {
-		digits = 5
-	}
-	if digits8 {
-		digits = 8
-	}
 	if redirected {
-		totp := oneTimePassword(strings.ToUpper(secret))
-		totp = totp[len(totp)-digits:]
+		totp := oneTimePassword(secret, size, algorithm)
 		fmt.Println(totp)
 		return
 	}
 
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
-		totp := oneTimePassword(strings.ToUpper(secret))
-		totp = totp[len(totp)-digits:]
+		totp := oneTimePassword(secret, size, algorithm)
 		left := period - time.Now().Unix()%period
 		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+yellow+totp+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
 		go func() {
@@ -230,7 +225,7 @@ func showSingleTotp(secret string) {
 
 func deleteEntry(name string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for deleting entry")
+	exitOnError(err, "Failure opening datafile for deleting entry")
 
 	if _, found := db.Entries[name]; found {
 		if !forceChange {
@@ -245,7 +240,7 @@ func deleteEntry(name string) {
 
 		delete(db.Entries, name)
 		err = saveDb(&db)
-		exitOnError(err, "Failure saving data file, entry not deleted")
+		exitOnError(err, "Failure saving datafile, entry not deleted")
 
 		fmt.Fprintln(os.Stderr, green+"Entry '"+name+"' deleted")
 	} else {
@@ -255,21 +250,21 @@ func deleteEntry(name string) {
 
 func changePassword() {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for changing password")
+	exitOnError(err, "Failure opening datafile for changing password")
 
 	fmt.Fprintln(os.Stderr, green+"Changing password")
 	err = initPassword(&db)
 	exitOnError(err, "Failure changing password")
 
 	err = saveDb(&db)
-	exitOnError(err, "Failure saving data file, password not changed")
+	exitOnError(err, "Failure saving datafile, password not changed")
 
 	fmt.Fprintln(os.Stderr, green+"Password change successful")
 }
 
 func revealSecret(name string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for revealing Secret")
+	exitOnError(err, "Failure opening datafile for revealing Secret")
 
 	secret := db.Entries[name].Secret
 	if secret == "" {
@@ -278,12 +273,12 @@ func revealSecret(name string) {
 	}
 
 	if redirected {
-		fmt.Printf("otpauth://totp/%s?secret=%s&digits=%d\n", url.PathEscape(name), secret, db.Entries[name].Digits)
+		fmt.Printf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
 		return
 	}
 
 	fmt.Fprintf(os.Stderr, "%s%s: %s%s%s\n", blue, name, yellow, secret, def)
-	fmt.Fprintf(os.Stderr, "otpauth://totp/%s?secret=%s&digits=%d\n", url.PathEscape(name), secret, db.Entries[name].Digits)
+	fmt.Fprintf(os.Stderr, "otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
 	fmt.Fprintf(os.Stderr, def+"[Press "+green+"Ctrl-C"+def+" to exit] ")
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
@@ -312,7 +307,7 @@ func renameEntry(name string, nname string) {
 	}
 
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for renaming of entry")
+	exitOnError(err, "Failure opening datafile for renaming of entry")
 
 	if _, found := db.Entries[name]; found {
 		if _, found := db.Entries[nname]; found {
@@ -326,22 +321,22 @@ func renameEntry(name string, nname string) {
 	db.Entries[nname] = db.Entries[name]
 	delete(db.Entries, name)
 	err = saveDb(&db)
-	exitOnError(err, "Failure saving data file, entry not renamed")
+	exitOnError(err, "Failure saving datafile, entry not renamed")
 
 	fmt.Fprintln(os.Stderr, green+"Entry '"+name+"' renamed to '"+nname+"'")
 }
 
 func clipTOTP(name string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for copying TOTP to clipboard")
+	exitOnError(err, "Failure opening datafile for copying TOTP to clipboard")
 
-	if secret := db.Entries[name].Secret; secret == "" {
+	secret := db.Entries[name].Secret
+	if secret == "" {
 		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' not found")
 		return
 	}
 
-	totp := oneTimePassword(db.Entries[name].Secret)
-	totp = totp[len(totp)-db.Entries[name].Digits:]
+	totp := oneTimePassword(secret, db.Entries[name].Digits, db.Entries[name].Algorithm)
 	clipboard.WriteAll(totp)
 	left := period - time.Now().Unix()%period
 	fmt.Fprintf(os.Stderr, green+"TOTP of "+yellow+"'"+name+"'"+green+" copied to clipboard, valid for"+yellow+" %d "+green+"s\n", left)
@@ -349,7 +344,7 @@ func clipTOTP(name string) {
 
 func showTotps(regex string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for showing TOTPs")
+	exitOnError(err, "Failure opening datafile for showing TOTPs")
 
 	// Match regex and sort on name
 	var names []string
@@ -360,12 +355,12 @@ func showTotps(regex string) {
 	}
 	if redirected {
 		for _, name := range names {
-			totp := oneTimePassword(db.Entries[name].Secret)
+			totp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm)
 			tag := name
 			if len(name) > maxNameLen {
 				tag = name[:maxNameLen]
 			}
-			fmt.Printf("%v %v\n", totp[len(totp)-db.Entries[name].Digits:], tag)
+			fmt.Printf("%v %v\n", totp, tag)
 		}
 		return
 	}
@@ -402,8 +397,8 @@ func showTotps(regex string) {
 		fmt.Fprintln(os.Stderr)
 		n := 0
 		for _, name := range names {
-			totp := oneTimePassword(db.Entries[name].Secret)
-			totp = fmt.Sprintf("%8v", totp[len(totp)-db.Entries[name].Digits:])
+			totp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm)
+			totp = fmt.Sprintf("%8v", totp)
 			tag := name
 			if len(name) > maxNameLen {
 				tag = name[:maxNameLen]
@@ -436,7 +431,7 @@ func showTotps(regex string) {
 
 func showNames(regex string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for showing Names")
+	exitOnError(err, "Failure opening datafile for showing Names")
 
 	// Match regex and sort on name
 	var names []string
@@ -462,12 +457,12 @@ func showNames(regex string) {
 
 func exportEntries(filename string) {
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for showing Names")
+	exitOnError(err, "Failure opening datafile for showing Names")
 
 	if filename == "" {
 		for name := range db.Entries {
-			line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%d&issuer=%s",
-				url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits, url.PathEscape(name))
+			line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s",
+				url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
 			fmt.Println(line)
 		}
 		return
@@ -479,8 +474,8 @@ func exportEntries(filename string) {
 	}
 
 	for name := range db.Entries {
-		line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%d\n",
-			url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits)
+		line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n",
+			url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
 		_, err = f.WriteString(line)
 		if err != nil {
 			exitOnError(err, "Error writing to "+filename)
@@ -492,17 +487,17 @@ func exportEntries(filename string) {
 
 func importEntries(filename string) {
 	file, err := os.Open(filename)
-	exitOnError(err, "Could not open data file '"+filename+"'")
+	exitOnError(err, "Could not open datafile '"+filename+"'")
 
 	reader := bufio.NewScanner(file)
 	reader.Split(bufio.ScanLines)
 	db, err := readDb(redirected)
-	exitOnError(err, "Failure opening data file for import")
+	exitOnError(err, "Failure opening datafile for import")
 
-	// Check data, then admit to data file, but only save when no errors
+	// Check data, then admit to datafile, but only save when no errors
 	n, ns := 0, ""
 	for reader.Scan() {
-		digits, secret := 6, ""
+		secret := ""
 		line := reader.Text()
 		n++
 		ns = fmt.Sprint(n)
@@ -517,7 +512,8 @@ func importEntries(filename string) {
 			exitOnError(errr, "The application is not 'totp'")
 		}
 
-		name := url.QueryEscape(uri.Path[1:])
+		name, err := url.PathUnescape(uri.Path[1:])
+		exitOnError(err, "invalid NAME")
 		if len(name) == 0 {
 			exitOnError(errr, "NAME must have content on line "+ns)
 		}
@@ -544,6 +540,7 @@ func importEntries(filename string) {
 		query, err := url.ParseQuery(uri.RawQuery)
 		exitOnError(err, "Invalid Query part of URI")
 
+		size, algorithm := "6", "SHA1"
 		for key, value := range query {
 			switch key {
 			case "secret":
@@ -551,24 +548,43 @@ func importEntries(filename string) {
 					exitOnError(errr, "Multiple SECRETs on line "+ns)
 				}
 
-				secret = value[0]
-				_, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(strings.ToUpper(secret))
+				secret = strings.ToUpper(value[0])
+				_, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
 				exitOnError(err, "Invalid base32 encoding in SECRET on line "+ns)
+
+			case "period":
+				if len(value) > 1 {
+					exitOnError(errr, "Multiple PERIODs on line "+ns)
+				}
+
+				if value[0] != "30" {
+					exitOnError(err, "Unsupported period (not 30) on line "+ns)
+				}
 
 			case "digits":
 				if len(value) > 1 {
 					exitOnError(errr, "Multiple TOTP LENGTHs (key 'digits') on line "+ns)
 				}
 
-				digits, err = strconv.Atoi(value[0])
-				exitOnError(err, "TOTP LENGTHs (key 'digits') not an integer")
-
-				if digits != 5 && digits != 6 && digits != 8 {
-					exitOnError(errr, "TOTP LENGTH (key 'digits') on line "+ns+"not 5/6/8: "+value[0])
+				if size != "5" && size != "6" && size != "7" && size != "8" {
+					exitOnError(errr, "TOTP LENGTH (key 'digits') on line "+ns+"not 5-8, but: "+value[0])
 				}
 
+			case "algorithm":
+				if len(value) > 1 {
+					exitOnError(errr, "Multiple HASHes (key 'algorithm') on line "+ns)
+				}
+
+				algorithm = strings.ToUpper(value[0])
+				if algorithm != "SHA1" && algorithm != "SHA256" && algorithm != "SHA512" {
+					exitOnError(errr, "HASH (key 'algorithm') on line "+ns+"not SHA1/SHA256/SHA512, but: "+algorithm)
+				}
+
+			case "issuer":
+				fmt.Fprintf(os.Stderr, green+"INFO"+def+": key '"+key+"' on line "+ns+" ignored\n"+def)
+
 			default:
-				fmt.Fprintf(os.Stderr, yellow+"WARNING"+def+": key '"+key+"' on line "+ns+" unsupported\n")
+				fmt.Fprintf(os.Stderr, yellow+"WARNING"+def+": key '"+key+"' on line "+ns+" unsupported, "+red+"ignored\n"+def)
 			}
 		}
 		if len(secret) == 0 {
@@ -576,19 +592,21 @@ func importEntries(filename string) {
 		}
 
 		db.Entries[name] = entry{
-			Secret: strings.ToUpper(secret),
-			Digits: digits,
+			Secret:    secret,
+			Digits:    size,
+			Algorithm: algorithm,
 		}
 	}
 	file.Close()
 	err = saveDb(&db)
-	exitOnError(err, "Failure saving database, entries not imported")
+	exitOnError(err, "Failure saving datafile, entries not imported")
 
 	fmt.Fprintf(os.Stderr, green+"All %d entries in '"+filename+"' successfully imported\n", n)
 }
 
 func main() {
-	self, cmd, regex, name, nname, secret, file, ddash := "", "", "", "", "", "", "", false
+	self, cmd, regex, datafile, name, nname, secret, file := "", "", "", "", "", "", "", ""
+	datafileflag, sizeflag, algorithmflag, size, algorithm, ddash := 0, 0, 0, "6", "SHA1", false
 	o, _ := os.Stdout.Stat()
 	if (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
 		redirected = false
@@ -599,51 +617,91 @@ func main() {
 			self = selves[len(selves)-1]
 			continue
 		}
-		if cmd == "" { // Determine command
+		if datafileflag == 1 { // Previous argument was -d/--datafile
+			datafile = arg
+			datafileflag = 2
+			continue
+		}
+		if sizeflag == 1 { // Previous argument was -s/--size
+			size = arg
+			sizeflag = 2
+			continue
+		}
+		if algorithmflag == 1 { // Previous argument was -a/--algorithm
+			algorithm = strings.ToUpper(arg)
+			algorithmflag = 2
+			continue
+		}
+		if !ddash {
+			if arg == "--" {
+				ddash = true
+				continue
+			}
+			if arg == "-f" || arg == "--force" {
+				forceChange = true
+				continue
+			}
+			if arg == "-d" || arg == "--datafile" {
+				if datafileflag > 0 {
+					usage("datafile already specified with -d/--datafile")
+				}
+				datafileflag = 1
+				continue
+			}
+			if arg == "-s" || arg == "--size" {
+				if sizeflag > 0 {
+					usage("size already specified with -s/--size")
+				}
+				sizeflag = 1
+				continue
+			}
+			if arg == "-a" || arg == "--algorithm" {
+				if algorithmflag > 0 {
+					usage("algorithm already specified with -a/--algorithm")
+				}
+				algorithmflag = 1
+				continue
+			}
+		}
+		if cmd == "" { // Determine command (from arg1)
 			switch arg { // First arg is command unless regex or dash-dash (arg1)
-			case "show", "view":
-				cmd = "s" // REGEX
-			case "--":
-				cmd, ddash = "s", true // REGEX
-			case "list", "ls":
-				cmd = "l" // REGEX
 			case "help", "--help", "-h":
 				usage("")
 			case "version", "--version", "-V":
 				fmt.Fprintln(os.Stderr, self+" version "+version)
 				return
 
+			case "show", "view":
+				cmd = "s" // REGEX
+			case "list", "ls":
+				cmd = "l" // REGEX
 			case "rename", "move", "mv":
-				cmd = "m" // NAME NEWNAME -f/--force
+				cmd = "m" // NAME  NEWNAME  -f/--force
 			case "add", "insert", "entry":
-				cmd = "a" // NAME SECRET -5 -8 -f/--force
+				cmd = "a" // NAME  SECRET  -s/--size LENGTH  -a/--algorithm HASH  -f/--force
 			case "totp", "temp":
-				cmd = "t" // SECRET -5 -8
+				cmd = "t" // SECRET  -s/--size LENGTH  -a/--algorithm HASH  -f/--force
 			case "reveal", "secret":
 				cmd = "r" // NAME
 			case "clip", "copy", "cp":
 				cmd = "c" // NAME
 			case "delete", "remove", "rm":
-				cmd = "d" // NAME -f/--force
+				cmd = "d" // NAME  -f/--force
 			case "password", "passwd", "pw":
 				cmd = "p" // none
 			case "export":
 				cmd = "e" // FILE
 			case "import":
-				cmd = "i" // FILE -f/--force
+				cmd = "i" // FILE  -f/--force
 			default: // No command, must be REGEX
 				cmd, regex = "s", arg
 			}
 			continue
 		}
-		// Arguments arg0 (self) and arg1 (cmd/REGEX) have been parsed
-		if !ddash && arg == "--" { // Catch '--' anywhere
-			ddash = true
-			continue
-		}
+		// self and cmd (or REGEX) and early -d/--datafile have been parsed
 		switch cmd { // Parse rest of args based on cmd
 		case "p":
-			usage("password command takes no argument")
+			usage("password command takes no further arguments")
 		case "s":
 			if regex != "" {
 				usage("too many arguments, regular expression REGEX already given")
@@ -696,17 +754,19 @@ func main() {
 				name = arg
 			}
 		case "a":
-			if !ddash && (arg == "-f" || arg == "--force") {
-				forceChange = true
-				continue
-			}
-			if !ddash && arg == "-5" {
-				digits5 = true
-				continue
-			}
-			if !ddash && arg == "-8" {
-				digits8 = true
-				continue
+			if !ddash {
+				if arg == "-f" || arg == "--force" {
+					forceChange = true
+					continue
+				}
+				if arg == "-s" || arg == "--size" {
+					sizeflag = 1
+					continue
+				}
+				if arg == "-a" || arg == "--algorithm" {
+					algorithmflag = 1
+					continue
+				}
 			}
 			if name != "" {
 				if secret != "" {
@@ -717,14 +777,6 @@ func main() {
 				name = arg
 			}
 		case "t":
-			if !ddash && arg == "-5" {
-				digits5 = true
-				continue
-			}
-			if !ddash && arg == "-8" {
-				digits8 = true
-				continue
-			}
 			if secret != "" {
 				usage("too many arguments, SECRET already given")
 			}
@@ -732,6 +784,18 @@ func main() {
 		}
 	}
 	// All arguments have been parsed, check
+	if datafileflag == 1 {
+		usage("flag -d/--datafile needs a DATAFILE as argument")
+	}
+	if sizeflag == 1 {
+		usage("flag -s/--size needs a LENGTH as argument")
+	}
+	if algorithmflag == 1 {
+		usage("flag -a/--algorithm needs a HASH as argument")
+	}
+	if datafile != "" {
+		dbPath = datafile
+	}
 	switch cmd {
 	case "", "s":
 		showTotps(regex)
@@ -741,9 +805,9 @@ func main() {
 		if name == "" {
 			usage("'add' command needs NAME as argument")
 		}
-		addEntry(name, secret)
+		addEntry(name, secret, size, algorithm)
 	case "t":
-		showSingleTotp(secret)
+		showSingleTotp(secret, size, algorithm)
 	case "m":
 		if name == "" || nname == "" {
 			usage("'rename' command needs NAME and NEWNAME as arguments")
@@ -778,38 +842,37 @@ func main() {
 
 func usage(err string) {
 	help := green + self + def + " v" + version + yellow + " - Manage TOTPs from CLI\n" +
-		def + "The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.\n" +
-		"Only pertinent plain text information goes to Stdout when it is redirected.\n" +
-		"* " + blue + "Repo" + def + ":       " + yellow + "github.com/pepa65/twofat" + def + " <pepa65@passchier.net>\n* " +
-		blue + "Data file" + def + ":  " + yellow + dbPath + def + "  (depends on the file name of the binary)\n* " +
-		blue + "Usage" + def + ":      " + yellow + self + def + " [" + green + "COMMAND" + def + "]\n" +
-		green + "  COMMAND" + def + ":\n" +
+		def + "The CLI is interactive & colorful, output to Stderr. " + blue + "SECRET" + def + " can be piped in.\n" +
+		"When output is redirected, only pertinent plain text is going to Stdout.\n" +
+		"* " + blue + "Repo" + def + ":       " + magenta + "github.com/pepa65/twofat" + def + " <pepa65@passchier.net>\n* " +
+		blue + "Datafile" + def + ":   " + magenta + dbPath + def + "  (default, depends on the binary's name)\n* " +
+		blue + "Usage" + def + ":      " + magenta + self + def + "  [" + green + "COMMAND" + def + "]  [ " + yellow + "-d" + def + " | " + yellow + "--datafile " + cyan + " DATAFILE" + def + " ]\n" +
+		"  == " + green + "COMMAND" + def + ":\n" +
 		"[ " + green + "show" + def + " | " + green + "view" + def + " ]  [" + blue + "REGEX" + def + "]\n" +
-		"    Display all TOTPs with Names [matching " + blue + "REGEX" + def + "] (the command is optional).\n" +
+		"    Display all TOTPs with " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "] (" + green + "show" + def + "/" + green + "view" + def + " is optional).\n" +
 		green + "list" + def + " | " + green + "ls" + def + "  [" + blue + "REGEX" + def + "]\n" +
-		"    List all Names [with Names matching " + blue + "REGEX" + def + "].\n" +
-		green + "add" + def + " | " + green + "insert" + def + " | " + green + "entry  " + blue + "NAME" + def + "  [" + yellow + "-5" + def + "/" + yellow + "-8" + def + "]  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]  [" + blue + "SECRET" + def + "]\n" +
+		"    List all " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "].\n" +
+		green + "add" + def + " | " + green + "insert" + def + " | " + green + "entry  " + blue + "NAME" + def + "  [" + yellow + "TOTP-OPTIONS" + def + "]  [ " + yellow + "-f" + def + " | " + yellow + "--force" + def + " ]  [" + blue + "SECRET" + def + "]\n" +
 		"    Add a new entry " + blue + "NAME" + def + " with " + blue + "SECRET" + def + " (queried when not given).\n" +
-		"    When " + yellow + "-5" + def + " is given, TOTP length is 5 digits (for Steam),\n" +
-		"    when " + yellow + "-8" + def + " is given, TOTP length is 8 digits, otherwise it is 6.\n" +
-		"    If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " length check.\n" +
-		green + "totp" + def + " | " + green + "temp" + def + "  [" + yellow + "-5" + def + "/" + yellow + "-8" + def + "]  [" + blue + "SECRET" + def + "]\n" +
-		"    Show the TOTP for " + blue + "SECRET" + def + " (queried when not given).\n" +
-		"    When " + yellow + "-5" + def + "/" + yellow + "-8" + def + " is given, TOTP length is 5 or 8 digits, otherwise it is 6.\n" +
-		"    (The data file is not queried nor written to.)\n" +
-		green + "delete" + def + " | " + green + "remove" + def + " | " + green + "rm  " + blue + "NAME" + def + "  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]\n" +
+		"    If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " max.length check.\n" +
+		green + "totp" + def + " | " + green + "temp" + def + "  [" + yellow + "TOTP-OPTIONS" + def + "]  [" + blue + "SECRET" + def + "]\n" +
+		"    Show the TOTP for " + blue + "SECRET" + def + " (queried when not given), no datafile access.\n" +
+		green + "delete" + def + " | " + green + "remove" + def + " | " + green + "rm  " + blue + "NAME" + def + "  [ " + yellow + "-f" + def + " | " + yellow + "--force" + def + " ]\n" +
 		"    Delete entry " + blue + "NAME" + def + ". If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": no confirmation asked.\n" +
-		green + "rename" + def + " | " + green + "move" + def + " | " + green + "mv  " + blue + "NAME  NEWNAME" + def + "  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]\n" +
-		"    Rename entry " + blue + "NAME" + def + " to " + blue + "NEWNAME" + def + ", if " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": no length checks.\n" +
-		green + "import  " + blue + "FILE" + def + "  [" + yellow + "-f" + def + "|" + yellow + "--force" + def + "]\n" +
+		green + "rename" + def + " | " + green + "move" + def + " | " + green + "mv  " + blue + "NAME  NEWNAME" + def + "  [ " + yellow + "-f" + def + " | " + yellow + "--force" + def + " ]\n" +
+		"    Rename entry " + blue + "NAME" + def + " to " + blue + "NEWNAME" + def + ", if " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": no max.length checks.\n" +
+		green + "import  " + blue + "FILE" + def + "  [ " + yellow + "-f" + def + " | " + yellow + "--force" + def + " ]\n" +
 		"    Import lines with OTPAUTH_URI from file " + blue + "FILE" + def + ".\n" +
-		"    If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " length check.\n" +
-		green + "export" + def + "  [" + blue + "FILE" + def + "]              Export OTPAUTH_URI-format entries [to file " + blue + "FILE" + def + "].\n" +
-		green + "reveal" + def + " | " + green + "secret  " + blue + "NAME" + def + "       Show Secret of entry " + blue + "NAME" + def + ".\n" +
+		"    If " + yellow + "-f" + def + "/" + yellow + "--force" + def + ": existing " + blue + "NAME" + def + " overwritten, no " + blue + "NAME" + def + " max.length check.\n" +
+		green + "export" + def + "  [" + blue + "FILE" + def + "]              Export " + magenta + "OTPAUTH_URI" + def + "-format entries [to file " + blue + "FILE" + def + "].\n" +
+		green + "reveal" + def + " | " + green + "secret  " + blue + "NAME" + def + "       Show " + blue + "SECRET" + def + " of entry " + blue + "NAME" + def + ".\n" +
 		green + "clip" + def + " | " + green + "copy" + def + " | " + green + "cp  " + blue + "NAME" + def + "      Put TOTP of entry " + blue + "NAME" + def + " onto the clipboard.\n" +
-		green + "password" + def + " | " + green + "passwd" + def + " | " + green + "pw" + def + "      Change data file encryption password.\n" +
+		green + "password" + def + " | " + green + "passwd" + def + " | " + green + "pw" + def + "      Change datafile encryption password.\n" +
 		green + "version" + def + " | " + green + "--version" + def + " | " + green + "-V" + def + "    Show version.\n" +
-		green + "help" + def + " | " + green + "--help" + def + " | " + green + "-h" + def + "          Show this help text."
+		green + "help" + def + " | " + green + "--help" + def + " | " + green + "-h" + def + "          Show this help text.\n" +
+		"  == " + yellow + "TOTP-OPTIONS" + def + ":\n" +
+		yellow + "-s" + def + " | " + yellow + "--size  " + cyan + "LENGTH" + def + "       TOTP length: " + cyan + "5" + def + "-" + cyan + "8" + def + " (default: " + cyan + "6" + def + ")\n" +
+		yellow + "-a" + def + " | " + yellow + "--algorithm  " + cyan + "HASH" + def + "    Hash algorithm: " + cyan + "SHA1" + def + "/" + cyan + "SHA256" + def + "/" + cyan + "SHA512" + def +" (default: " + cyan + "SHA1" + def + ")"
 	fmt.Fprintln(os.Stderr, help)
 	if err != "" {
 		fmt.Fprintln(os.Stderr, red+"Abort: "+err)

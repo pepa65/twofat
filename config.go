@@ -12,7 +12,6 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
-	"os/exec"
 	"os/user"
 	"path"
 	"strings"
@@ -30,6 +29,8 @@ const (
 	green             = "\033[1m\033[32m"
 	yellow            = "\033[1m\033[33m"
 	blue              = "\033[1m\033[34m"
+	magenta           = "\033[1m\033[35m"
+	cyan              = "\033[1m\033[36m"
 	def               = "\033[0m"
 )
 
@@ -40,16 +41,27 @@ var (
 )
 
 type entry struct {
-	Secret string
-	Digits int
+	Secret    string
+	Digits    string
+	Algorithm string
+}
+
+type oldentry struct { // Before v1.0.0
+	Secret    string
+	Digits    int
 }
 
 type dbase struct {
 	Pwd     []byte
 	Entries map[string]entry
+	OldEntries map[string]oldentry
 }
 
 func init() {
+	if dbPath != "" {
+		return
+	}
+
 	user, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -70,7 +82,7 @@ func deriveKey(password []byte, salt []byte, hashLen uint32) (hashRaw []byte) {
 func readDb(redirected bool) (dbase, error) {
 	var db dbase
 	if _, err := os.Stat(dbPath); err == nil {
-		// Database file present
+		// Datafile file present
 		dbdata, err := ioutil.ReadFile(dbPath)
 		if err != nil || len(dbdata) < nonceSize+1 {
 			return dbase{}, errors.New("insufficient data in " + dbPath)
@@ -78,15 +90,14 @@ func readDb(redirected bool) (dbase, error) {
 
 		nonce := dbdata[:nonceSize]
 		encdata := dbdata[nonceSize:]
-		exec.Command("reset").Run()
 		if !redirected {
-			fmt.Fprintln(os.Stderr, "Database: "+blue+dbPath+def)
+			fmt.Fprintln(os.Stderr, cls+"Datafile: "+blue+dbPath+def)
 		}
 		if !term.IsTerminal(0) { // Piped in
 			db.Pwd, _ = io.ReadAll(os.Stdin)
 		}
 		if len(db.Pwd) == 0 {
-			fmt.Fprintf(os.Stderr, yellow+"Enter database password: "+def)
+			fmt.Fprintf(os.Stderr, yellow+"Enter datafile password: "+def)
 			db.Pwd, _ = term.ReadPassword(0)
 			fmt.Fprintln(os.Stderr)
 		}
@@ -109,6 +120,12 @@ func readDb(redirected bool) (dbase, error) {
 		buf := bytes.NewBuffer(decryptedData)
 		err = gob.NewDecoder(buf).Decode(&db.Entries)
 		if err != nil {
+			buf = bytes.NewBuffer(decryptedData)
+			err = gob.NewDecoder(buf).Decode(&db.OldEntries)
+			if err == nil {
+				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this old datafile with 'twofat' version below 1.0.0\nand import the exported data with twofat v1.0.0 or later.")
+				os.Exit(1)
+			}
 			return dbase{}, errors.New("invalid entries data")
 		}
 
@@ -117,7 +134,7 @@ func readDb(redirected bool) (dbase, error) {
 
 	// Database file not present
 	os.MkdirAll(path.Dir(dbPath), 0700)
-	fmt.Fprintln(os.Stderr, green+"Initializing database file"+def)
+	fmt.Fprintln(os.Stderr, green+"Initializing datafile"+def)
 	initPassword(&db)
 	db.Entries = make(map[string]entry)
 	saveDb(&db)
@@ -154,7 +171,7 @@ func saveDb(db *dbase) error {
 	buf.Write(encryptedData)
 	err = ioutil.WriteFile(dbPath, buf.Bytes(), 0600)
 	if err != nil {
-		return errors.New("database write error")
+		return errors.New("datafile write error")
 	}
 
 	return nil
@@ -162,15 +179,14 @@ func saveDb(db *dbase) error {
 
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
-	exec.Command("reset").Run()
-	fmt.Fprintln(os.Stderr, "Database: "+blue+dbPath+def)
+	fmt.Fprintln(os.Stderr, cls+"Datafile: "+blue+dbPath+def)
 	for retryTimes > 0 {
-		fmt.Fprintf(os.Stderr, yellow+"New database password: ")
+		fmt.Fprintf(os.Stderr, yellow+"New datafile password: ")
 		pwd, _ := term.ReadPassword(0)
 		if len(pwd) == 0 {
 			fmt.Fprintf(os.Stderr, red+"\nPassword can't be empty")
 		} else {
-			fmt.Fprintf(os.Stderr, "\nConfirm database password: ")
+			fmt.Fprintf(os.Stderr, "\nConfirm datafile password: ")
 			pwdc, _ := term.ReadPassword(0)
 			fmt.Fprintln(os.Stderr, def)
 			if bytes.Equal(pwd, pwdc) {
