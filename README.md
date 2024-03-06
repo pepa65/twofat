@@ -1,6 +1,6 @@
 # twofat
 ## Manage TOTPs from CLI
-* **v1.0.0**
+* **v1.0.1**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
@@ -49,7 +49,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v1.0.0 - Manage TOTPs from CLI
+twofat v1.0.1 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. SECRET can be piped in.
 When output is redirected, only pertinent plain text is going to Stdout.
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>

@@ -23,7 +23,7 @@ import (
 )
 
 const (
-	version    = "1.0.0"
+	version    = "1.0.1"
 	maxNameLen = 20
 	period     = 30
 )
@@ -317,7 +317,7 @@ func renameEntry(name string, nname string) {
 		exitOnError(errr, "Entry '"+name+"' not found")
 	}
 
-	// Name exists, Newname doesn't
+	// NAME exists, NEWNAME doesn't
 	db.Entries[nname] = db.Entries[name]
 	delete(db.Entries, name)
 	err = saveDb(&db)
@@ -664,7 +664,7 @@ func main() {
 			}
 		}
 		if cmd == "" { // Determine command (from arg1)
-			switch arg { // First arg is command unless regex or dash-dash (arg1)
+			switch arg { // First arg is command unless regex (arg1)
 			case "help", "--help", "-h":
 				usage("")
 			case "version", "--version", "-V":
@@ -698,7 +698,7 @@ func main() {
 			}
 			continue
 		}
-		// self and cmd (or REGEX) and early -d/--datafile have been parsed
+		// self and cmd (or REGEX) and early -d/--datafile && double-dash have been parsed
 		switch cmd { // Parse rest of args based on cmd
 		case "p":
 			usage("password command takes no further arguments")
