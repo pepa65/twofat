@@ -1,14 +1,14 @@
 # twofat
 ## Manage TOTPs from CLI
-* **v1.1.0**
+* **v2.0.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
 * Install: `wget -qO- gobinaries.com/pepa65/twofat |sh`
 * Migration from pre v1.0.0 versions of twofat:
-  **Export the data with twofat before v1.0.0 and import that twofat v1.0.0 or later.**
-* Migration from pre v1.1.0 versions of twofat:
-  **Export the data with twofat before v1.1.0 (or before v1.0.0) and import that twofat v1.1.0 or later.**
+  **Export the data with twofat v0 and import that with twofat v1.**
+* Migration from pre v2.0.0 versions of twofat:
+  **Export the data with twofat v1 (or v0) and import that with twofat v2.**
 
 ### Features
 * Data saved with AES-GCM encrypt in ~/.twofat.enc (by default).
@@ -53,7 +53,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v1.1.0 - Manage TOTPs from CLI
+twofat v2.0.0 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. Password can be piped in.
 When output is redirected, only pertinent plain text is sent to Stdout.
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>

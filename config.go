@@ -40,19 +40,19 @@ var (
 	errWrongPassword = errors.New("password error")
 )
 
-type entry struct {
+type entry struct { // v2.x.y
 	Secret    []byte
 	Digits    string
 	Algorithm string
 }
 
-type pre1_1_0 struct { // Before v1.1.0
+type entryV1 struct { // v1.x.y
 	Secret    string
 	Digits    string
 	Algorithm string
 }
 
-type pre1_0_0 struct { // Before v1.0.0
+type entryV0 struct { // v0.x.y
 	Secret    string
 	Digits    int
 }
@@ -60,8 +60,8 @@ type pre1_0_0 struct { // Before v1.0.0
 type dbase struct {
 	Pwd     []byte
 	Entries map[string]entry
-	Pre1_1_0 map[string]pre1_1_0
-	Pre1_0_0 map[string]pre1_0_0
+	EntriesV1 map[string]entryV1
+	EntriesV0 map[string]entryV0
 }
 
 func init() {
@@ -131,15 +131,15 @@ func readDb(clearscr bool) (dbase, error) {
 		err = gob.NewDecoder(buf).Decode(&db.Entries)
 		if err != nil {
 			buf = bytes.NewBuffer(decryptedData)
-			err = gob.NewDecoder(buf).Decode(&db.Pre1_1_0)
+			err = gob.NewDecoder(buf).Decode(&db.EntriesV1)
 			if err == nil {
-				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this v1.0.0 datafile with 'twofat' version 1.0.0 or 1.0.1\nand import the exported data with twofat v1.1.0 or later.")
+				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this v1 datafile with 'twofat' version 1.0.0 or 1.0.1\nand import the exported data with twofat v2.0.0 or later.")
 				os.Exit(1)
 			}
 			buf = bytes.NewBuffer(decryptedData)
-			err = gob.NewDecoder(buf).Decode(&db.Pre1_0_0)
+			err = gob.NewDecoder(buf).Decode(&db.EntriesV0)
 			if err == nil {
-				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this pre v1.0.0 datafile with 'twofat' version 0.11.0 or earlier\nand import the exported data with twofat v1.1.0 or later.")
+				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this v0 datafile with 'twofat' version 0.11.0 or earlier\nand import the exported data with twofat v2.0.0 or later.")
 				os.Exit(1)
 			}
 			return dbase{}, errors.New("invalid entries data")

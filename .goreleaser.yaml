@@ -1,6 +1,7 @@
 upx:
-  - enabled: false
+  - enabled: true
     compress: best
+    goos: [linux]
 
 archives:
 - format: binary
@@ -15,10 +16,13 @@ builds:
       - freebsd
       - openbsd
       - plan9
+
 checksum:
   name_template: 'checksums.txt'
+
 snapshot:
   name_template: "{{ incpatch .Version }}-next"
+
 changelog:
   sort: asc
   filters:
