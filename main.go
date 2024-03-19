@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"crypto/hmac"
 	"crypto/sha1"
 	"crypto/sha256"
@@ -13,6 +14,8 @@ import (
 	"os"
 	"os/signal"
 	"regexp"
+	"runtime"
+	"slices"
 	"sort"
 	"strings"
 	"syscall"
@@ -23,16 +26,16 @@ import (
 )
 
 const (
-	version    = "1.0.1"
+	version    = "1.1.0"
 	maxNameLen = 20
 	period     = 30
 )
 
 var (
-	errr        = errors.New("Error")
-	forceChange = false
-	redirected  = true
-	interrupt   = make(chan os.Signal)
+	errr       = errors.New("Error")
+	force      = false
+	redirected = true
+	interrupt  = make(chan os.Signal)
 )
 
 func exitOnError(err error, errMsg string) {
@@ -56,8 +59,17 @@ func toUint32(bytes []byte) uint32 {
 	return uint32(bytes[0])<<24 + uint32(bytes[1])<<16 + uint32(bytes[2])<<8 + uint32(bytes[3])
 }
 
-func oneTimePassword(secret, size, algorithm string) string {
-	byteSecret, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+func wipe(bytes []byte) {
+	for i := range bytes {
+		bytes[i] = 0
+	}
+	runtime.GC()
+}
+
+func oneTimePassword(secret []byte, size, algorithm string) string {
+	decsecret := make([]byte, base32.StdEncoding.WithPadding(base32.NoPadding).DecodedLen(len(secret)))
+	_, err := base32.StdEncoding.WithPadding(base32.NoPadding).Decode(decsecret, secret)
+	//wipe(secret)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err.Error())
 		os.Exit(2)
@@ -67,21 +79,25 @@ func oneTimePassword(secret, size, algorithm string) string {
 	var hash []byte
 	switch algorithm {
 		case "SHA1": // Sign the value using HMAC-SHA1
-			hmacSha1 := hmac.New(sha1.New, byteSecret)
+			hmacSha1 := hmac.New(sha1.New, decsecret)
+			wipe(decsecret)
 			hmacSha1.Write(value)
 			hash = hmacSha1.Sum(nil)
 		case "SHA256": // Sign the value using HMAC-SHA256
-			hmacSha256 := hmac.New(sha256.New, byteSecret)
+			hmacSha256 := hmac.New(sha256.New, decsecret)
+			wipe(decsecret)
 			hmacSha256.Write(value)
 			hash = hmacSha256.Sum(nil)
 		case "SHA512": // Sign the value using HMAC-SHA512
-			hmacSha512 := hmac.New(sha512.New, byteSecret)
+			hmacSha512 := hmac.New(sha512.New, decsecret)
+			wipe(decsecret)
 			hmacSha512.Write(value)
 			hash = hmacSha512.Sum(nil)
 		default:
+			wipe(decsecret)
 			exitOnError(errr, "Unsupported algorithm: "+algorithm)
-
 	}
+
 	offset := hash[len(hash)-1] & 0x0F
 	// Get 32-bit chunk from the hash starting at offset
 	hmacParts := hash[offset:offset+4]
@@ -92,45 +108,50 @@ func oneTimePassword(secret, size, algorithm string) string {
 	return totp[8-l:]
 }
 
-func checkBase32(secret string) string {
-	secret = strings.ToUpper(secret)
-	secret = strings.ReplaceAll(secret, "-", "")
-	secret = strings.ReplaceAll(secret, " ", "")
-	secret = strings.ReplaceAll(secret, "=", "")
-	if secret == "" {
-		return ""
+func checkBase32(secret []byte) []byte {
+	secret = bytes.ToUpper(secret)
+	secret = slices.DeleteFunc(secret, func(b byte) bool {
+		return b == '-' || b == ' ' || b == '=' || b == '\n'
+	})
+	if len(secret) == 0 {
+		return nil
 	}
 
-	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
+	decsecret := make([]byte, base32.StdEncoding.WithPadding(base32.NoPadding).DecodedLen(len(secret)))
+	_, e := base32.StdEncoding.WithPadding(base32.NoPadding).Decode(decsecret, secret)
+	wipe(decsecret)
 	if e != nil {
 		fmt.Fprintln(os.Stderr, red+"Invalid base32"+def+" (Valid characters: 2-7 and A-Z; ignored: spaces and dashes)")
-		return ""
+		return nil
 	}
 
 	return secret
 }
 
-func addEntry(name, secret, size, algorithm string) {
-	if !forceChange && len([]rune(name)) > maxNameLen {
-		exitOnError(errr, "Name longer than "+fmt.Sprint(maxNameLen))
+func addEntry(name string, secret []byte, size, algorithm string, clearscr bool) {
+	clr := ""
+	if clearscr {
+		clr = cls
+	}
+	if !force && len([]rune(name)) > maxNameLen {
+		exitOnError(errr, clr+"Name longer than "+fmt.Sprint(maxNameLen))
 	}
 
 	// NAME should not have a colon or percent sign
 	if strings.Contains(name, ":") || strings.Contains(name, "%") {
-		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' contains ':' or '%'")
-		return
+		exitOnError(errr, clr+"Entry '"+name+"' contains ':' or '%'")
 	}
 
-	db, err := readDb(redirected)
+	db, err := readDb(clearscr)
 	exitOnError(err, "Failure opening datafile for adding entry")
 
 	action := "added"
 	if _, found := db.Entries[name]; found {
-		if !forceChange {
+		if !force {
 			fmt.Fprintf(os.Stderr, yellow+"Entry '"+name+"' exists, confirm change [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadByte()
-			if cfm != 'y' {
+			if cfm != 'y' && cfm != 'Y' {
 				fmt.Fprintln(os.Stderr, red+"Entry not changed")
 				return
 			}
@@ -139,35 +160,35 @@ func addEntry(name, secret, size, algorithm string) {
 		action = "changed"
 	}
 
-	secret = checkBase32(secret)
-	// If SECRET not supplied or invalid, ask for it
+	// If SECRET not given or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
-	for secret == "" {
+	for len(secret) == 0 {
 		fmt.Fprintf(os.Stderr, yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
-		secret, _ = reader.ReadString('\n')
-		secret = strings.TrimSuffix(secret, "\n")
-		if secret == "" {
-			break
+		secret, _ = reader.ReadBytes('\n')
+		if len(secret) == 0 {
+			return
 		}
 		secret = checkBase32(secret)
 	}
-	if secret == "" {
-		fmt.Fprintln(os.Stderr, cls+red+"Adding entry '"+name+"' cancelled")
+	if len(secret) == 0 {
+		fmt.Fprintln(os.Stderr, red+"Adding entry '"+name+"' cancelled")
 		return
 	}
 
+	fmt.Fprintf(os.Stderr, cls)
 	db.Entries[name] = entry{
 		Secret:    secret,
 		Digits:    size,
 		Algorithm: algorithm,
 	}
 	err = saveDb(&db)
-	exitOnError(err, cls+"Failure saving datafile, entry not "+action)
+	exitOnError(err, "Failure saving datafile, entry not "+action)
 
-	fmt.Fprintf(os.Stderr, cls+green+" Entry '"+yellow+name+green+" %s\n", action)
+	fmt.Fprintf(os.Stderr, green+" Entry '"+yellow+name+green+"' %s\n", action)
 	if redirected {
 		totp := oneTimePassword(secret, size, algorithm)
 		fmt.Println(totp)
+		wipe(secret)
 		return
 	}
 
@@ -180,31 +201,28 @@ func addEntry(name, secret, size, algorithm string) {
 		go func() {
 			<-interrupt
 			fmt.Fprintf(os.Stderr, cls)
+			wipe(secret)
 			os.Exit(0)
 		}()
 		time.Sleep(time.Second)
 	}
 }
 
-func showSingleTotp(secret, size, algorithm string) {
-	secret = checkBase32(secret)
-	// If SECRET not supplied or invalid, ask for it
+func showSingleTotp(secret []byte, size, algorithm string) {
+	// If SECRET not given or invalid, ask for it
 	reader := bufio.NewReader(os.Stdin)
-	for secret == "" {
+	for len(secret) == 0 {
 		fmt.Fprintf(os.Stderr, yellow+"Enter base32 Secret"+def+" [empty field to cancel]: ")
-		secret, _ = reader.ReadString('\n')
-		secret = strings.TrimSuffix(secret, "\n")
-		if secret == "" {
-			break
+		secret, _ = reader.ReadBytes('\n')
+		if len(secret) == 0 { // Nothing entered, bail
+			return
 		}
+
 		secret = checkBase32(secret)
 	}
-	if secret == "" {
-		return
-	}
-
 	if redirected {
 		totp := oneTimePassword(secret, size, algorithm)
+		wipe(secret)
 		fmt.Println(totp)
 		return
 	}
@@ -217,6 +235,7 @@ func showSingleTotp(secret, size, algorithm string) {
 		go func() {
 			<-interrupt
 			fmt.Fprintf(os.Stderr, cls)
+			wipe(secret)
 			os.Exit(0)
 		}()
 		time.Sleep(time.Second)
@@ -224,11 +243,11 @@ func showSingleTotp(secret, size, algorithm string) {
 }
 
 func deleteEntry(name string) {
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for deleting entry")
 
 	if _, found := db.Entries[name]; found {
-		if !forceChange {
+		if !force {
 			fmt.Fprintf(os.Stderr, yellow+"Sure to delete entry '"+name+"'? [y/N] ")
 			reader := bufio.NewReader(os.Stdin)
 			cfm, _ := reader.ReadByte()
@@ -249,7 +268,7 @@ func deleteEntry(name string) {
 }
 
 func changePassword() {
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for changing password")
 
 	fmt.Fprintln(os.Stderr, green+"Changing password")
@@ -263,28 +282,30 @@ func changePassword() {
 }
 
 func revealSecret(name string) {
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for revealing Secret")
 
 	secret := db.Entries[name].Secret
-	if secret == "" {
+	if len(secret) == 0 {
 		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' not found")
 		return
 	}
 
 	if redirected {
-		fmt.Printf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
+		fmt.Printf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), string(secret), db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
+		wipe(secret)
 		return
 	}
 
-	fmt.Fprintf(os.Stderr, "%s%s: %s%s%s\n", blue, name, yellow, secret, def)
-	fmt.Fprintf(os.Stderr, "otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
+	fmt.Fprintf(os.Stderr, "%s%s: %s%s%s\n", blue, name, yellow, string(secret), def)
+	fmt.Fprintf(os.Stderr, "otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), string(secret), db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
 	fmt.Fprintf(os.Stderr, def+"[Press "+green+"Ctrl-C"+def+" to exit] ")
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
 		go func() {
 			<-interrupt
 			fmt.Fprintf(os.Stderr, cls)
+			wipe(secret)
 			os.Exit(0)
 		}()
 		time.Sleep(time.Second)
@@ -292,11 +313,11 @@ func revealSecret(name string) {
 }
 
 func renameEntry(name string, nname string) {
-	if !forceChange && len([]rune(name)) > maxNameLen {
+	if !force && len([]rune(name)) > maxNameLen {
 		exitOnError(errr, "NAME longer than "+fmt.Sprint(maxNameLen))
 	}
 
-	if !forceChange && len([]rune(nname)) > maxNameLen {
+	if !force && len([]rune(nname)) > maxNameLen {
 		exitOnError(errr, "NEWNAME longer than "+fmt.Sprint(maxNameLen))
 	}
 
@@ -306,7 +327,7 @@ func renameEntry(name string, nname string) {
 		return
 	}
 
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for renaming of entry")
 
 	if _, found := db.Entries[name]; found {
@@ -327,11 +348,11 @@ func renameEntry(name string, nname string) {
 }
 
 func clipTOTP(name string) {
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for copying TOTP to clipboard")
 
 	secret := db.Entries[name].Secret
-	if secret == "" {
+	if len(secret) == 0 {
 		fmt.Fprintln(os.Stderr, red+"Entry '"+name+"' not found")
 		return
 	}
@@ -343,7 +364,7 @@ func clipTOTP(name string) {
 }
 
 func showTotps(regex string) {
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for showing TOTPs")
 
 	// Match regex and sort on name
@@ -421,6 +442,7 @@ func showTotps(regex string) {
 			go func() {
 				<-interrupt
 				fmt.Fprintf(os.Stderr, cls)
+				runtime.GC()
 				os.Exit(0)
 			}()
 			time.Sleep(time.Second)
@@ -430,7 +452,7 @@ func showTotps(regex string) {
 }
 
 func showNames(regex string) {
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for showing Names")
 
 	// Match regex and sort on name
@@ -456,33 +478,38 @@ func showNames(regex string) {
 }
 
 func exportEntries(filename string) {
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for showing Names")
 
-	if filename == "" {
-		for name := range db.Entries {
-			line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s",
-				url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
-			fmt.Println(line)
-		}
-		return
-	}
-
-	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0400)
-	if err != nil {
-		exitOnError(err, "Cannot create file or file exists")
-	}
-
+	var otpauths []string
 	for name := range db.Entries {
 		line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n",
-			url.PathEscape(name), db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
-		_, err = f.WriteString(line)
-		if err != nil {
-			exitOnError(err, "Error writing to "+filename)
-		}
+			url.PathEscape(name), string(db.Entries[name].Secret), db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
+		otpauths = append(otpauths, line)
 	}
+	sort.Strings(otpauths)
+	if filename == "" {
+		for _, line := range otpauths {
+			fmt.Printf("%s", line)
+		}
+	} else {
+		f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0400)
+		if err != nil {
+			runtime.GC()
+			exitOnError(err, "Cannot create file or file exists")
+		}
 
-	fmt.Fprintf(os.Stderr, "%sFile exported:%s %s\n", green, def, filename)
+		for _, line := range otpauths {
+			_, err = f.WriteString(line)
+			if err != nil {
+				runtime.GC()
+				exitOnError(err, "Error writing to "+filename)
+			}
+		}
+
+		fmt.Fprintf(os.Stderr, "%sFile exported:%s %s\n", green, def, filename)
+	}
+	runtime.GC()
 }
 
 func importEntries(filename string) {
@@ -491,13 +518,13 @@ func importEntries(filename string) {
 
 	reader := bufio.NewScanner(file)
 	reader.Split(bufio.ScanLines)
-	db, err := readDb(redirected)
+	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for import")
 
 	// Check data, then admit to datafile, but only save when no errors
-	n, ns := 0, ""
+	n, ns, issuerseen := 0, "", false
 	for reader.Scan() {
-		secret := ""
+		var secret []byte
 		line := reader.Text()
 		n++
 		ns = fmt.Sprint(n)
@@ -519,7 +546,7 @@ func importEntries(filename string) {
 		}
 
 		if len(name) > maxNameLen {
-			if forceChange {
+			if force {
 				fmt.Fprintf(os.Stderr, yellow+"WARNING"+def+": NAME longer than %d on line %d\n", maxNameLen, n)
 			} else {
 				exitOnError(errr, fmt.Sprintf("NAME longer than %d on line %d", maxNameLen, n))
@@ -533,7 +560,7 @@ func importEntries(filename string) {
 		}
 
 		_, found := db.Entries[name]
-		if found && !forceChange {
+		if found && !force {
 			exitOnError(errr, "Entry '"+name+"' on line "+ns+" exists, force overwrite with -f/--force")
 		}
 
@@ -548,9 +575,10 @@ func importEntries(filename string) {
 					exitOnError(errr, "Multiple SECRETs on line "+ns)
 				}
 
-				secret = strings.ToUpper(value[0])
-				_, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(secret)
-				exitOnError(err, "Invalid base32 encoding in SECRET on line "+ns)
+				secret = checkBase32([]byte(value[0]))
+				if len(secret) == 0 {
+					exitOnError(err, "Invalid base32 encoding in SECRET on line "+ns)
+				}
 
 			case "period":
 				if len(value) > 1 {
@@ -581,8 +609,7 @@ func importEntries(filename string) {
 				}
 
 			case "issuer":
-				fmt.Fprintf(os.Stderr, green+"INFO"+def+": key '"+key+"' on line "+ns+" ignored\n"+def)
-
+				issuerseen = true
 			default:
 				fmt.Fprintf(os.Stderr, yellow+"WARNING"+def+": key '"+key+"' on line "+ns+" unsupported, "+red+"ignored\n"+def)
 			}
@@ -598,14 +625,19 @@ func importEntries(filename string) {
 		}
 	}
 	file.Close()
+	if issuerseen {
+		fmt.Fprintf(os.Stderr, green+"INFO"+def+": key 'issuer' ignored\n"+def)
+	}
 	err = saveDb(&db)
+	runtime.GC()
 	exitOnError(err, "Failure saving datafile, entries not imported")
 
 	fmt.Fprintf(os.Stderr, green+"All %d entries in '"+filename+"' successfully imported\n", n)
 }
 
 func main() {
-	self, cmd, regex, datafile, name, nname, secret, file := "", "", "", "", "", "", "", ""
+	self, cmd, regex, datafile, name, nname, file := "", "", "", "", "", "", ""
+	var secret []byte
 	datafileflag, sizeflag, algorithmflag, size, algorithm, ddash := 0, 0, 0, "6", "SHA1", false
 	o, _ := os.Stdout.Stat()
 	if (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
@@ -638,7 +670,7 @@ func main() {
 				continue
 			}
 			if arg == "-f" || arg == "--force" {
-				forceChange = true
+				force = true
 				continue
 			}
 			if arg == "-d" || arg == "--datafile" {
@@ -672,33 +704,33 @@ func main() {
 				return
 
 			case "show", "view":
-				cmd = "s" // REGEX
+				cmd = "s" // [REGEX]
 			case "list", "ls":
-				cmd = "l" // REGEX
+				cmd = "l" // [REGEX]
 			case "rename", "move", "mv":
-				cmd = "m" // NAME  NEWNAME  -f/--force
+				cmd = "m" // NAME  NEWNAME  [-f/--force]
 			case "add", "insert", "entry":
-				cmd = "a" // NAME  SECRET  -s/--size LENGTH  -a/--algorithm HASH  -f/--force
+				cmd = "a" // NAME  [SECRET]  [-s/--size LENGTH]  [-a/--algorithm HASH]  [-f/--force]
 			case "totp", "temp":
-				cmd = "t" // SECRET  -s/--size LENGTH  -a/--algorithm HASH  -f/--force
+				cmd = "t" // [SECRET]  [-s/--size LENGTH]  [-a/--algorithm HASH]  [-f/--force]
 			case "reveal", "secret":
 				cmd = "r" // NAME
 			case "clip", "copy", "cp":
 				cmd = "c" // NAME
 			case "delete", "remove", "rm":
-				cmd = "d" // NAME  -f/--force
+				cmd = "d" // NAME  [-f/--force]
 			case "password", "passwd", "pw":
 				cmd = "p" // none
 			case "export":
-				cmd = "e" // FILE
+				cmd = "e" // [FILE]
 			case "import":
-				cmd = "i" // FILE  -f/--force
+				cmd = "i" // FILE  [-f/--force]
 			default: // No command, must be REGEX
 				cmd, regex = "s", arg
 			}
 			continue
 		}
-		// self and cmd (or REGEX) and early -d/--datafile && double-dash have been parsed
+		// self and cmd (or REGEX) and early flags && double-dash have been parsed
 		switch cmd { // Parse rest of args based on cmd
 		case "p":
 			usage("password command takes no further arguments")
@@ -719,7 +751,7 @@ func main() {
 			file = arg
 		case "i":
 			if !ddash && (arg == "-f" || arg == "--force") {
-				forceChange = true
+				force = true
 				continue
 			}
 			if file != "" {
@@ -728,7 +760,7 @@ func main() {
 			file = arg
 		case "d":
 			if !ddash && (arg == "-f" || arg == "--force") {
-				forceChange = true
+				force = true
 				continue
 			}
 			if name != "" {
@@ -742,7 +774,7 @@ func main() {
 			name = arg
 		case "m":
 			if !ddash && (arg == "-f" || arg == "--force") {
-				forceChange = true
+				force = true
 				continue
 			}
 			if name != "" {
@@ -756,7 +788,7 @@ func main() {
 		case "a":
 			if !ddash {
 				if arg == "-f" || arg == "--force" {
-					forceChange = true
+					force = true
 					continue
 				}
 				if arg == "-s" || arg == "--size" {
@@ -769,18 +801,18 @@ func main() {
 				}
 			}
 			if name != "" {
-				if secret != "" {
+				if len(secret) > 0 {
 					usage("too many arguments, NAME and SECRET already given")
 				}
-				secret = arg
+				secret = checkBase32([]byte(arg))
 			} else {
 				name = arg
 			}
 		case "t":
-			if secret != "" {
+			if len(secret) > 0 {
 				usage("too many arguments, SECRET already given")
 			}
-			secret = arg
+			secret = checkBase32([]byte(arg))
 		}
 	}
 	// All arguments have been parsed, check
@@ -805,7 +837,11 @@ func main() {
 		if name == "" {
 			usage("'add' command needs NAME as argument")
 		}
-		addEntry(name, secret, size, algorithm)
+		if len(secret) != 0 {
+			addEntry(name, secret, size, algorithm, true)
+		} else {
+			addEntry(name, secret, size, algorithm, false)
+		}
 	case "t":
 		showSingleTotp(secret, size, algorithm)
 	case "m":
@@ -838,12 +874,13 @@ func main() {
 		}
 		importEntries(file)
 	}
+	wipe(secret)
 }
 
 func usage(err string) {
 	help := green + self + def + " v" + version + yellow + " - Manage TOTPs from CLI\n" +
-		def + "The CLI is interactive & colorful, output to Stderr. " + blue + "SECRET" + def + " can be piped in.\n" +
-		"When output is redirected, only pertinent plain text is going to Stdout.\n" +
+		def + "The CLI is interactive & colorful, output to Stderr. Password can be piped in.\n" +
+		"When output is redirected, only pertinent plain text is sent to Stdout.\n" +
 		"* " + blue + "Repo" + def + ":       " + magenta + "github.com/pepa65/twofat" + def + " <pepa65@passchier.net>\n* " +
 		blue + "Datafile" + def + ":   " + magenta + dbPath + def + "  (default, depends on the binary's name)\n* " +
 		blue + "Usage" + def + ":      " + magenta + self + def + "  [" + green + "COMMAND" + def + "]  [ " + yellow + "-d" + def + " | " + yellow + "--datafile " + cyan + " DATAFILE" + def + " ]\n" +

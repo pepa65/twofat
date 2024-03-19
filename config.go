@@ -41,12 +41,18 @@ var (
 )
 
 type entry struct {
+	Secret    []byte
+	Digits    string
+	Algorithm string
+}
+
+type pre1_1_0 struct { // Before v1.1.0
 	Secret    string
 	Digits    string
 	Algorithm string
 }
 
-type oldentry struct { // Before v1.0.0
+type pre1_0_0 struct { // Before v1.0.0
 	Secret    string
 	Digits    int
 }
@@ -54,7 +60,8 @@ type oldentry struct { // Before v1.0.0
 type dbase struct {
 	Pwd     []byte
 	Entries map[string]entry
-	OldEntries map[string]oldentry
+	Pre1_1_0 map[string]pre1_1_0
+	Pre1_0_0 map[string]pre1_0_0
 }
 
 func init() {
@@ -79,7 +86,10 @@ func deriveKey(password []byte, salt []byte, hashLen uint32) (hashRaw []byte) {
 	return argon2.IDKey(password, salt, 3, 65536, 4, hashLen)
 }
 
-func readDb(redirected bool) (dbase, error) {
+func readDb(clearscr bool) (dbase, error) {
+	if clearscr {
+		fmt.Fprintf(os.Stderr, cls)
+	}
 	var db dbase
 	if _, err := os.Stat(dbPath); err == nil {
 		// Datafile file present
@@ -91,7 +101,7 @@ func readDb(redirected bool) (dbase, error) {
 		nonce := dbdata[:nonceSize]
 		encdata := dbdata[nonceSize:]
 		if !redirected {
-			fmt.Fprintln(os.Stderr, cls+"Datafile: "+blue+dbPath+def)
+			fmt.Fprintln(os.Stderr, "Datafile: "+blue+dbPath+def)
 		}
 		if !term.IsTerminal(0) { // Piped in
 			db.Pwd, _ = io.ReadAll(os.Stdin)
@@ -121,9 +131,15 @@ func readDb(redirected bool) (dbase, error) {
 		err = gob.NewDecoder(buf).Decode(&db.Entries)
 		if err != nil {
 			buf = bytes.NewBuffer(decryptedData)
-			err = gob.NewDecoder(buf).Decode(&db.OldEntries)
+			err = gob.NewDecoder(buf).Decode(&db.Pre1_1_0)
 			if err == nil {
-				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this old datafile with 'twofat' version below 1.0.0\nand import the exported data with twofat v1.0.0 or later.")
+				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this v1.0.0 datafile with 'twofat' version 1.0.0 or 1.0.1\nand import the exported data with twofat v1.1.0 or later.")
+				os.Exit(1)
+			}
+			buf = bytes.NewBuffer(decryptedData)
+			err = gob.NewDecoder(buf).Decode(&db.Pre1_0_0)
+			if err == nil {
+				fmt.Fprintln(os.Stderr, cyan+"Export the contents of this pre v1.0.0 datafile with 'twofat' version 0.11.0 or earlier\nand import the exported data with twofat v1.1.0 or later.")
 				os.Exit(1)
 			}
 			return dbase{}, errors.New("invalid entries data")
@@ -179,7 +195,7 @@ func saveDb(db *dbase) error {
 
 func initPassword(db *dbase) error {
 	retryTimes := pwRetry
-	fmt.Fprintln(os.Stderr, cls+"Datafile: "+blue+dbPath+def)
+	fmt.Fprintln(os.Stderr, "Datafile: "+blue+dbPath+def)
 	for retryTimes > 0 {
 		fmt.Fprintf(os.Stderr, yellow+"New datafile password: ")
 		pwd, _ := term.ReadPassword(0)
@@ -191,6 +207,7 @@ func initPassword(db *dbase) error {
 			fmt.Fprintln(os.Stderr, def)
 			if bytes.Equal(pwd, pwdc) {
 				db.Pwd = pwd
+				wipe(pwdc)
 				return nil
 			}
 
