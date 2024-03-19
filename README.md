@@ -1,4 +1,6 @@
 # twofat
+<img src="https://raw.githubusercontent.com/pepa65/twofat/master/twofat.png" width="96" alt="twofat icon" align="right">
+
 ## Manage TOTPs from CLI
 * **v2.0.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
