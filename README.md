@@ -95,7 +95,7 @@ Each exported line has a OTPAUTH_URI of the form:
 `otpauth://totp/NAME?secret=SECRET&algorithm=HASH&digits=LENGTH&period=30&issuer=NAME`
 (the capitalized parts are variable parameters: `NAME`, `SECRET`, `LENGTH`, `HASH`).
 
-* The `NAME` should not have a colon `:` or `%` (messes with URL conversion).
+* The `NAME` should not have a colon `:` or `%` (messes with URI conversion).
   (`NAME` could be `ISSUER:ACCOUNTNAME`, but `twofat` uses the full `NAME` for the `issuer` parameter.)
 * The `SECRET` is the base32 RFC3548 seed (without the `=` padding!) for the OTPs.
 * The parameter `period` is fixed to `30` (the default) in (almost?) all apps.
