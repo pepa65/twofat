@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version    = "2.0.3"
+	version    = "2.0.4"
 	maxNameLen = 20
 	period     = 30
 )
@@ -298,7 +298,7 @@ func revealSecret(name string) {
 	}
 
 	fmt.Fprintf(os.Stderr, "%s%s: %s%s%s\n", blue, name, yellow, string(secret), def)
-	fmt.Fprintf(os.Stderr, "otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), string(secret), db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
+	fmt.Fprintf(os.Stderr, "otpauth://totp/%s?secret=%s&algorithm=%s&digits=%s&period=30&issuer=%s\n", url.PathEscape(name), string(secret), db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
 	fmt.Fprintf(os.Stderr, def+"[Press "+green+"Ctrl-C"+def+" to exit] ")
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
@@ -483,7 +483,7 @@ func exportEntries(filename string) {
 
 	var otpauths []string
 	for name := range db.Entries {
-		line := fmt.Sprintf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n",
+		line := fmt.Sprintf("otpauth://totp/%s?secret=%s&algorithm=%s&digits=%s&period=30&issuer=%s\n",
 			url.PathEscape(name), string(db.Entries[name].Secret), db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
 		otpauths = append(otpauths, line)
 	}
