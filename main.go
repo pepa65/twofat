@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version    = "2.0.2"
+	version    = "2.0.3"
 	maxNameLen = 20
 	period     = 30
 )
@@ -292,7 +292,7 @@ func revealSecret(name string) {
 	}
 
 	if redirected {
-		fmt.Printf("otpauth://totp/%s?secret=%s&digits=%s&algorithm=%s&period=30&issuer=%s\n", url.PathEscape(name), string(secret), db.Entries[name].Digits, db.Entries[name].Algorithm, url.PathEscape(name))
+		fmt.Printf("otpauth://totp/%s?secret=%s&algorithm=%s&digits=%s&period=30&issuer=%s\n", url.PathEscape(name), string(secret), db.Entries[name].Algorithm, db.Entries[name].Digits, url.PathEscape(name))
 		wipe(secret)
 		return
 	}

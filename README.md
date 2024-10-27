@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/pepa65/twofat/master/twofat.png" width="96" alt="twofat icon" align="right">
 
 ## Manage TOTPs from CLI
-* **v2.0.2**
+* **v2.0.3**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
@@ -55,7 +55,7 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v2.0.2 - Manage TOTPs from CLI
+twofat v2.0.3 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. Password can be piped in.
 When output is redirected, only pertinent plain text is sent to Stdout.
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
@@ -92,15 +92,15 @@ help | --help | -h          Show this help text.
 ### Import/Export data
 `twofat` abides by the backup standard from: https://authenticator.cc/docs/en/otp-backup-developer
 Each exported line has a OTPAUTH_URI of the form:
-`otpauth://totp/NAME?secret=SECRET&digits=LENGTH&algorithm=HASH&period=30&issuer=NAME`
+`otpauth://totp/NAME?secret=SECRET&algorithm=HASH&digits=LENGTH&period=30&issuer=NAME`
 (the capitalized parts are variable parameters: `NAME`, `SECRET`, `LENGTH`, `HASH`).
 
 * The `NAME` should not have a colon `:` or `%` (messes with URL conversion).
   (`NAME` could be `ISSUER:ACCOUNTNAME`, but `twofat` uses the full `NAME` for the `issuer` parameter.)
 * The `SECRET` is the base32 RFC3548 seed (without the `=` padding!) for the OTPs.
-* The `LENGTH` is most often `6`, but can be set to `5` (for Steam), `7` (Twitch) or `8` (Microsoft).
 * The parameter `period` is fixed to `30` (the default) in (almost?) all apps.
-* The `algorithm` is `SHA1` (the default), `SHA256` or `SHA512`.
+* The `LENGTH` for `digits` is most often `6`, but can be set to `5` (for Steam), `7` (Twitch) or `8` (Microsoft).
+* The `HASH` for `algorithm` is `SHA1` (the default), `SHA256` or `SHA512`.
 * The `issuer` is set to `NAME` on export in `twofat`, ignored on import.
 * On import, `digits`, `period` and `algorithm` will be set to the defaults when not specified.
 
