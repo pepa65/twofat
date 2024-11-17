@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version    = "2.0.7"
+	version    = "2.1.0"
 	maxNameLen = 20
 	period     = 30
 )
@@ -638,7 +638,7 @@ func importEntries(filename string) {
 func main() {
 	self, cmd, regex, datafile, name, nname, file := "", "", "", "", "", "", ""
 	var secret []byte
-	datafileflag, sizeflag, algorithmflag, size, algorithm, ddash := 0, 0, 0, "6", "SHA1", false
+	datafileflag, sizeflag, algorithmflag, size, algorithm, ddash, cas := 0, 0, 0, "6", "SHA1", false, false
 	o, _ := os.Stdout.Stat()
 	if (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
 		redirected = false
@@ -667,6 +667,10 @@ func main() {
 		if !ddash {
 			if arg == "--" {
 				ddash = true
+				continue
+			}
+			if arg == "-c" || arg == "--case" {
+				cas = true
 				continue
 			}
 			if arg == "-f" || arg == "--force" {
@@ -704,9 +708,9 @@ func main() {
 				return
 
 			case "show", "view":
-				cmd = "s" // [REGEX]
+				cmd = "s" // [REGEX]  [-c/--case]
 			case "list", "ls":
-				cmd = "l" // [REGEX]
+				cmd = "l" // [REGEX]  [-c/--case]
 			case "rename", "move", "mv":
 				cmd = "m" // NAME  NEWNAME  [-f/--force]
 			case "add", "insert", "entry":
@@ -816,6 +820,9 @@ func main() {
 		}
 	}
 	// All arguments have been parsed, check
+	if cas && cmd != "s" && cmd != "l" {
+		usage("flag -c/--case can only be given on show/view and list/ls commands")
+	}
 	if datafileflag == 1 {
 		usage("flag -d/--datafile needs a DATAFILE as argument")
 	}
@@ -827,6 +834,9 @@ func main() {
 	}
 	if datafile != "" {
 		dbPath = datafile
+	}
+	if regex != "" && !cas {
+		regex = "(?i)"+regex
 	}
 	switch cmd {
 	case "", "s":
@@ -885,9 +895,9 @@ func usage(err string) {
 		blue + "Datafile" + def + ":   " + magenta + dbPath + def + "  (default, depends on the binary's name)\n* " +
 		blue + "Usage" + def + ":      " + magenta + self + def + "  [" + green + "COMMAND" + def + "]  [ " + yellow + "-d" + def + " | " + yellow + "--datafile " + cyan + " DATAFILE" + def + " ]\n" +
 		"  == " + green + "COMMAND" + def + ":\n" +
-		"[ " + green + "show" + def + " | " + green + "view" + def + " ]  [" + blue + "REGEX" + def + "]\n" +
+		"[ " + green + "show" + def + " | " + green + "view" + def + " ]  [" + blue + "REGEX" + def + " [ " + yellow + "-c" + def + " | " + yellow + "--case" + def + " ]]\n" +
 		"    Display all TOTPs with " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "] (" + green + "show" + def + "/" + green + "view" + def + " is optional).\n" +
-		green + "list" + def + " | " + green + "ls" + def + "  [" + blue + "REGEX" + def + "]\n" +
+		green + "list" + def + " | " + green + "ls" + def + "  [" + blue + "REGEX" + def + " [ " + yellow + "-c" + def + " | " + yellow + "--case" + def + " ]]\n" +
 		"    List all " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "].\n" +
 		green + "add" + def + " | " + green + "insert" + def + " | " + green + "entry  " + blue + "NAME" + def + "  [" + yellow + "TOTP-OPTIONS" + def + "]  [ " + yellow + "-f" + def + " | " + yellow + "--force" + def + " ]  [" + blue + "SECRET" + def + "]\n" +
 		"    Add a new entry " + blue + "NAME" + def + " with " + blue + "SECRET" + def + " (queried when not given).\n" +
@@ -907,6 +917,7 @@ func usage(err string) {
 		green + "password" + def + " | " + green + "passwd" + def + " | " + green + "pw" + def + "      Change datafile encryption password.\n" +
 		green + "version" + def + " | " + green + "--version" + def + " | " + green + "-V" + def + "    Show version.\n" +
 		green + "help" + def + " | " + green + "--help" + def + " | " + green + "-h" + def + "          Show this help text.\n" +
+		"  == " + blue + "REGEX" + def + ":  Optional, case-insensitive matching (unless " + yellow + "-c" + def + "/" + yellow + "--case" + def + " is given).\n" +
 		"  == " + yellow + "TOTP-OPTIONS" + def + ":\n" +
 		yellow + "-s" + def + " | " + yellow + "--size  " + cyan + "LENGTH" + def + "       TOTP length: " + cyan + "5" + def + "-" + cyan + "8" + def + " (default: " + cyan + "6" + def + ")\n" +
 		yellow + "-a" + def + " | " + yellow + "--algorithm  " + cyan + "HASH" + def + "    Hash algorithm: " + cyan + "SHA1" + def + "/" + cyan + "SHA256" + def + "/" + cyan + "SHA512" + def +" (default: " + cyan + "SHA1" + def + ")"
