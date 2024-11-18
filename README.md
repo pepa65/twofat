@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/pepa65/twofat/master/twofat.png" width="96" alt="twofat icon" align="right">
 
 ## Manage TOTPs from CLI
-* **v2.1.0**
+* **v2.1.1**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
@@ -55,16 +55,16 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v2.0.7 - Manage TOTPs from CLI
+twofat v2.1.1 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. Password can be piped in.
 When output is redirected, only pertinent plain text is sent to Stdout.
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
-* Data file:  ~/.twofat.enc  (default, depends on the binary's name)
+* Datafile:   ~/.twofat.enc  (default, depends on the binary's name)
 * Usage:      twofat  [COMMAND]  [ -d | --datafile  DATAFILE ]
   == COMMAND:
-[ show | view ]  [[-c|--case] REGEX]
+[ show | view ]  [REGEX [ -c | --case ]]
     Display all TOTPs with NAMEs [matching REGEX] (show/view is optional).
-list | ls  [[-c|--case] REGEX]
+list | ls  [REGEX [ -c | --case ]]
     List all NAMEs [matching REGEX].
 add | insert | entry  NAME  [TOTP-OPTIONS]  [ -f | --force ]  [SECRET]
     Add a new entry NAME with SECRET (queried when not given).
@@ -84,10 +84,10 @@ clip | copy | cp  NAME      Put TOTP of entry NAME onto the clipboard.
 password | passwd | pw      Change datafile encryption password.
 version | --version | -V    Show version.
 help | --help | -h          Show this help text.
-  == REGEX:  Optional, case-insensitive matching (unless if -c/--case given)
+  == REGEX:  Optional, case-insensitive matching (unless -c/--case is given).
   == TOTP-OPTIONS:
--s | --size  LENGTH       TOTP length: 5-8 (default: 6)
--a | --algorithm  HASH    Hash algorithm: SHA1/SHA256/SHA512 (default: SHA1)
+-s | --size  LENGTH       TOTP length: 5-8 (default: 6).
+-a | --algorithm  HASH    Hash algorithm: SHA1/SHA256/SHA512 (default: SHA1).
 ```
 
 ### Import/Export data

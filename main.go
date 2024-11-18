@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version    = "2.1.0"
+	version    = "2.1.1"
 	maxNameLen = 20
 	period     = 30
 )
@@ -919,8 +919,8 @@ func usage(err string) {
 		green + "help" + def + " | " + green + "--help" + def + " | " + green + "-h" + def + "          Show this help text.\n" +
 		"  == " + blue + "REGEX" + def + ":  Optional, case-insensitive matching (unless " + yellow + "-c" + def + "/" + yellow + "--case" + def + " is given).\n" +
 		"  == " + yellow + "TOTP-OPTIONS" + def + ":\n" +
-		yellow + "-s" + def + " | " + yellow + "--size  " + cyan + "LENGTH" + def + "       TOTP length: " + cyan + "5" + def + "-" + cyan + "8" + def + " (default: " + cyan + "6" + def + ")\n" +
-		yellow + "-a" + def + " | " + yellow + "--algorithm  " + cyan + "HASH" + def + "    Hash algorithm: " + cyan + "SHA1" + def + "/" + cyan + "SHA256" + def + "/" + cyan + "SHA512" + def +" (default: " + cyan + "SHA1" + def + ")"
+		yellow + "-s" + def + " | " + yellow + "--size  " + cyan + "LENGTH" + def + "       TOTP length: " + cyan + "5" + def + "-" + cyan + "8" + def + " (default: " + cyan + "6" + def + ").\n" +
+		yellow + "-a" + def + " | " + yellow + "--algorithm  " + cyan + "HASH" + def + "    Hash algorithm: " + cyan + "SHA1" + def + "/" + cyan + "SHA256" + def + "/" + cyan + "SHA512" + def +" (default: " + cyan + "SHA1" + def + ")."
 	fmt.Fprintln(os.Stderr, help)
 	if err != "" {
 		fmt.Fprintln(os.Stderr, red+"Abort: "+err)
