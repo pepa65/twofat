@@ -2,7 +2,7 @@
 <img src="https://raw.githubusercontent.com/pepa65/twofat/master/twofat.png" width="96" alt="twofat icon" align="right">
 
 ## Manage TOTPs from CLI
-* **v2.1.1**
+* **v2.2.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
@@ -18,6 +18,7 @@
   For even more security, run like: `GODEBUG=clobberfree=1 twofat`
 * Datafile password can be changed.
 * Display TOTPs of names matching regex, which auto-refresh.
+* Option to display the next TOTP as well.
 * Add, rename, delete entry, reveal secret, copy TOTP to clipboard.
 * Import & export entries from & to standardized OTPAUTH_URI file.
 * Adjusts to terminal width for display. NAME truncated to 20 on display
@@ -55,15 +56,15 @@ CGO_ENABLED=0 GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o twofat.exe
 
 ## Usage
 ```
-twofat v2.1.1 - Manage TOTPs from CLI
+twofat v2.2.0 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. Password can be piped in.
 When output is redirected, only pertinent plain text is sent to Stdout.
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
 * Datafile:   ~/.twofat.enc  (default, depends on the binary's name)
 * Usage:      twofat  [COMMAND]  [ -d | --datafile  DATAFILE ]
   == COMMAND:
-[ show | view ]  [REGEX [ -c | --case ]]
-    Display all TOTPs with NAMEs [matching REGEX] (show/view is optional).
+[ show | view ]  [REGEX [ -c | --case ]]  [ -n | --next ]
+    Display all TOTPs with NAMEs [matching REGEX] (-n/--next: show next TOTP).
 list | ls  [REGEX [ -c | --case ]]
     List all NAMEs [matching REGEX].
 add | insert | entry  NAME  [TOTP-OPTIONS]  [ -f | --force ]  [SECRET]

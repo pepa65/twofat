@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version    = "2.1.1"
+	version    = "2.2.0"
 	maxNameLen = 20
 	period     = 30
 )
@@ -66,7 +66,7 @@ func wipe(bytes []byte) {
 	runtime.GC()
 }
 
-func oneTimePassword(secret []byte, size, algorithm string) string {
+func oneTimePassword(secret []byte, size, algorithm string, epoch int64) string {
 	decsecret := make([]byte, base32.StdEncoding.WithPadding(base32.NoPadding).DecodedLen(len(secret)))
 	_, err := base32.StdEncoding.WithPadding(base32.NoPadding).Decode(decsecret, secret)
 	//wipe(secret)
@@ -75,7 +75,7 @@ func oneTimePassword(secret []byte, size, algorithm string) string {
 		os.Exit(2)
 	}
 
-	value := toBytes(time.Now().Unix() / period)
+	value := toBytes((time.Now().Unix() + 30*epoch) / period)
 	var hash []byte
 	switch algorithm {
 		case "SHA1": // Sign the value using HMAC-SHA1
@@ -186,7 +186,7 @@ func addEntry(name string, secret []byte, size, algorithm string, clearscr bool)
 
 	fmt.Fprintf(os.Stderr, green+" Entry '"+yellow+name+green+"' %s\n", action)
 	if redirected {
-		totp := oneTimePassword(secret, size, algorithm)
+		totp := oneTimePassword(secret, size, algorithm, 0)
 		fmt.Println(totp)
 		wipe(secret)
 		return
@@ -194,9 +194,10 @@ func addEntry(name string, secret []byte, size, algorithm string, clearscr bool)
 
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
-		totp := oneTimePassword(secret, size, algorithm)
+		totp := oneTimePassword(secret, size, algorithm, 0)
+		ntotp := oneTimePassword(secret, size, algorithm, 1)
 		left := period - time.Now().Unix()%period
-		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+yellow+totp+blue+"  Validity:"+yellow+
+		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+green+totp+blue+"  Next: "+magenta+ntotp+blue+"  Validity:"+yellow+
 			" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
 		go func() {
 			<-interrupt
@@ -221,7 +222,7 @@ func showSingleTotp(secret []byte, size, algorithm string) {
 		secret = checkBase32(secret)
 	}
 	if redirected {
-		totp := oneTimePassword(secret, size, algorithm)
+		totp := oneTimePassword(secret, size, algorithm, 0)
 		wipe(secret)
 		fmt.Println(totp)
 		return
@@ -229,9 +230,10 @@ func showSingleTotp(secret []byte, size, algorithm string) {
 
 	signal.Notify(interrupt, os.Interrupt, syscall.SIGINT)
 	for {
-		totp := oneTimePassword(secret, size, algorithm)
+		totp := oneTimePassword(secret, size, algorithm, 0)
+		ntotp := oneTimePassword(secret, size, algorithm, 1)
 		left := period - time.Now().Unix()%period
-		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+yellow+totp+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
+		fmt.Fprintf(os.Stderr, blue+"\r TOTP: "+green+totp+blue+"  Next: "+magenta+ntotp+blue+"  Validity:"+yellow+" %2d"+blue+"s  "+def+"[Press "+green+"Ctrl-C"+def+" to exit] ", left)
 		go func() {
 			<-interrupt
 			fmt.Fprintf(os.Stderr, cls)
@@ -357,13 +359,13 @@ func clipTOTP(name string) {
 		return
 	}
 
-	totp := oneTimePassword(secret, db.Entries[name].Digits, db.Entries[name].Algorithm)
+	totp := oneTimePassword(secret, db.Entries[name].Digits, db.Entries[name].Algorithm, 0)
 	clipboard.WriteAll(totp)
 	left := period - time.Now().Unix()%period
 	fmt.Fprintf(os.Stderr, green+"TOTP of "+yellow+"'"+name+"'"+green+" copied to clipboard, valid for"+yellow+" %d "+green+"s\n", left)
 }
 
-func showTotps(regex string) {
+func showTotps(regex string, next bool) {
 	db, err := readDb(false)
 	exitOnError(err, "Failure opening datafile for showing TOTPs")
 
@@ -376,12 +378,13 @@ func showTotps(regex string) {
 	}
 	if redirected {
 		for _, name := range names {
-			totp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm)
+			totp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, 0)
+			ntotp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, 1)
 			tag := name
 			if len(name) > maxNameLen {
 				tag = name[:maxNameLen]
 			}
-			fmt.Printf("%v %v\n", totp, tag)
+			fmt.Printf("%v (%v) %v\n", totp, ntotp, tag)
 		}
 		return
 	}
@@ -398,7 +401,16 @@ func showTotps(regex string) {
 
 	// Check display capabilities
 	w, h, _ := term.GetSize(int(os.Stdout.Fd()))
-	cols := (w + 1) / (8 + 1 + maxNameLen + 1)
+	cols, hdr, hdrspc := 0, "", ""
+	if next {
+		cols = (w + 1) / (8 + 1 + 8 + 1 + maxNameLen + 1)
+		hdr = "   TOTP  nextTOTP - Name"
+		hdrspc = fmt.Sprintf(strings.Repeat(" ", maxNameLen-6))
+	} else {
+		cols = (w + 1) / (8 + 1 + maxNameLen + 1)
+		hdr = "   TOTP - Name"
+		hdrspc = fmt.Sprintf(strings.Repeat(" ", maxNameLen-4))
+	}
 	if cols < 1 {
 		exitOnError(errr, "Terminal too narrow to properly display entries")
 	}
@@ -408,23 +420,28 @@ func showTotps(regex string) {
 	}
 
 	sort.Strings(names)
-
 	fmtstr := "%s %-" + fmt.Sprint(maxNameLen) + "s"
 	for {
-		fmt.Fprintf(os.Stderr, cls+blue+"   TOTP - Name")
+		fmt.Fprintf(os.Stderr, cls+blue+hdr)
 		for i := 1; i < cols && i < nn; i++ {
-			fmt.Fprintf(os.Stderr, strings.Repeat(" ", maxNameLen-1)+"TOTP - Name")
+			fmt.Fprintf(os.Stderr, hdrspc + hdr)
 		}
 		fmt.Fprintln(os.Stderr)
 		n := 0
 		for _, name := range names {
-			totp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm)
+			totp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, 0)
 			totp = fmt.Sprintf("%8v", totp)
 			tag := name
 			if len(name) > maxNameLen {
 				tag = name[:maxNameLen]
 			}
-			fmt.Fprintf(os.Stderr, fmtstr, green+totp+def, tag)
+			if next {
+				ntotp := oneTimePassword(db.Entries[name].Secret, db.Entries[name].Digits, db.Entries[name].Algorithm, 1)
+				ntotp = fmt.Sprintf("%8v", ntotp)
+				fmt.Fprintf(os.Stderr, fmtstr, green+totp+magenta+ntotp+def, tag)
+			} else {
+				fmt.Fprintf(os.Stderr, fmtstr, green+totp+def, tag)
+			}
 			n += 1
 			if n%cols == 0 {
 				fmt.Fprintln(os.Stderr)
@@ -638,7 +655,7 @@ func importEntries(filename string) {
 func main() {
 	self, cmd, regex, datafile, name, nname, file := "", "", "", "", "", "", ""
 	var secret []byte
-	datafileflag, sizeflag, algorithmflag, size, algorithm, ddash, cas := 0, 0, 0, "6", "SHA1", false, false
+	datafileflag, sizeflag, algorithmflag, size, algorithm, ddash, cas, next := 0, 0, 0, "6", "SHA1", false, false, false
 	o, _ := os.Stdout.Stat()
 	if (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
 		redirected = false
@@ -677,6 +694,10 @@ func main() {
 				force = true
 				continue
 			}
+			if arg == "-n" || arg == "--next" {
+				next = true
+				continue
+			}
 			if arg == "-d" || arg == "--datafile" {
 				if datafileflag > 0 {
 					usage("datafile already specified with -d/--datafile")
@@ -708,7 +729,7 @@ func main() {
 				return
 
 			case "show", "view":
-				cmd = "s" // [REGEX]  [-c/--case]
+				cmd = "s" // [REGEX]  [-c/--case]  [-n/--next]
 			case "list", "ls":
 				cmd = "l" // [REGEX]  [-c/--case]
 			case "rename", "move", "mv":
@@ -820,7 +841,10 @@ func main() {
 		}
 	}
 	// All arguments have been parsed, check
-	if cas && cmd != "s" && cmd != "l" {
+	if next && cmd != "" && cmd != "s" {
+		usage("flag -n/--next can only be given on show/view command")
+	}
+	if cas && cmd != "" && cmd != "s" && cmd != "l" {
 		usage("flag -c/--case can only be given on show/view and list/ls commands")
 	}
 	if datafileflag == 1 {
@@ -840,7 +864,7 @@ func main() {
 	}
 	switch cmd {
 	case "", "s":
-		showTotps(regex)
+		showTotps(regex, next)
 	case "l":
 		showNames(regex)
 	case "a":
@@ -895,8 +919,8 @@ func usage(err string) {
 		blue + "Datafile" + def + ":   " + magenta + dbPath + def + "  (default, depends on the binary's name)\n* " +
 		blue + "Usage" + def + ":      " + magenta + self + def + "  [" + green + "COMMAND" + def + "]  [ " + yellow + "-d" + def + " | " + yellow + "--datafile " + cyan + " DATAFILE" + def + " ]\n" +
 		"  == " + green + "COMMAND" + def + ":\n" +
-		"[ " + green + "show" + def + " | " + green + "view" + def + " ]  [" + blue + "REGEX" + def + " [ " + yellow + "-c" + def + " | " + yellow + "--case" + def + " ]]\n" +
-		"    Display all TOTPs with " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "] (" + green + "show" + def + "/" + green + "view" + def + " is optional).\n" +
+		"[ " + green + "show" + def + " | " + green + "view" + def + " ]  [" + blue + "REGEX" + def + " [ " + yellow + "-c" + def + " | " + yellow + "--case" + def + " ]]  [ " + yellow + "-n" + def + " | " + yellow + "--next" + def + " ]\n" +
+		"    Display all TOTPs with " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "] (" + yellow + "-n" + def + "/" + yellow + "--next" + def + ": show next TOTP).\n" +
 		green + "list" + def + " | " + green + "ls" + def + "  [" + blue + "REGEX" + def + " [ " + yellow + "-c" + def + " | " + yellow + "--case" + def + " ]]\n" +
 		"    List all " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "].\n" +
 		green + "add" + def + " | " + green + "insert" + def + " | " + green + "entry  " + blue + "NAME" + def + "  [" + yellow + "TOTP-OPTIONS" + def + "]  [ " + yellow + "-f" + def + " | " + yellow + "--force" + def + " ]  [" + blue + "SECRET" + def + "]\n" +
