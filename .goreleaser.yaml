@@ -1,21 +1,39 @@
+version: 2
+
 upx:
   - enabled: true
+    lzma: true
     compress: best
     goos: [linux]
 
 archives:
-- format: binary
+- formats: [binary]
 
 builds:
   - env:
       - CGO_ENABLED=0
     goos:
-      - linux
       - darwin
       - windows
       - freebsd
       - openbsd
+      - netbsd
+      - dragonfly
       - plan9
+      - linux
+    goarch:
+      - arm
+      - arm64
+      - amd64
+    goarm:
+      - 5
+      - 6
+      - 7
+    ignore:
+      - goos: windows
+        goarch: arm
+      - goos: windows
+        goarch: arm64
 
 checksum:
   name_template: 'checksums.txt'
@@ -29,3 +47,4 @@ changelog:
     exclude:
       - '^docs:'
       - '^test:'
+
