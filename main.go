@@ -920,7 +920,7 @@ func usage(err string) {
 		blue + "Usage" + def + ":      " + magenta + self + def + "  [" + green + "COMMAND" + def + "]  [ " + yellow + "-d" + def + " | " + yellow + "--datafile " + cyan + " DATAFILE" + def + " ]\n" +
 		"  == " + green + "COMMAND" + def + ":\n" +
 		"[ " + green + "show" + def + " | " + green + "view" + def + " ]  [" + blue + "REGEX" + def + " [ " + yellow + "-c" + def + " | " + yellow + "--case" + def + " ]]  [ " + yellow + "-n" + def + " | " + yellow + "--next" + def + " ]\n" +
-		"    Display all TOTPs with " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "] (" + yellow + "-n" + def + "/" + yellow + "--next" + def + ": show next TOTP).\n" +
+		"    Display TOTPs with " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "] (" + yellow + "-n" + def + "/" + yellow + "--next" + def + ": also show next TOTP).\n" +
 		green + "list" + def + " | " + green + "ls" + def + "  [" + blue + "REGEX" + def + " [ " + yellow + "-c" + def + " | " + yellow + "--case" + def + " ]]\n" +
 		"    List all " + blue + "NAME" + def + "s [matching " + blue + "REGEX" + def + "].\n" +
 		green + "add" + def + " | " + green + "insert" + def + " | " + green + "entry  " + blue + "NAME" + def + "  [" + yellow + "TOTP-OPTIONS" + def + "]  [ " + yellow + "-f" + def + " | " + yellow + "--force" + def + " ]  [" + blue + "SECRET" + def + "]\n" +
