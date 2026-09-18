@@ -660,11 +660,14 @@ func main() {
 	if (o.Mode() & os.ModeCharDevice) == os.ModeCharDevice {
 		redirected = false
 	}
-	for _, arg := range os.Args {
-		if self == "" { // Get binary name (arg0)
+	for argi, arg := range os.Args {
+		if argi == 0 { // Get binary name (arg0)
 			selves := strings.Split(arg, "/")
 			self = selves[len(selves)-1]
 			continue
+		}
+		if argi == 1 && runtime.GOOS == "android" {
+			continue  // Skip weird inserted argument on Android Termux
 		}
 		if datafileflag == 1 { // Previous argument was -d/--datafile
 			datafile = arg
