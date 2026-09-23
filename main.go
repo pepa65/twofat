@@ -610,8 +610,10 @@ func importEntries(filename string) {
 				if len(value) > 1 {
 					exitOnError(errr, "Multiple TOTP LENGTHs (key 'digits') on line "+ns)
 				}
-
-				if size != "5" && size != "6" && size != "7" && size != "8" {
+				switch value[0] {
+				case "5", "6", "7", "8":
+					size = value[0]
+				default:
 					exitOnError(errr, "TOTP LENGTH (key 'digits') on line "+ns+"not 5-8, but: "+value[0])
 				}
 
@@ -641,7 +643,10 @@ func importEntries(filename string) {
 			Algorithm: algorithm,
 		}
 	}
-	file.Close()
+	defer file.Close()
+	if reader.Err() != nil {
+		exitOnError(reader.Err(), "reading import file")
+	}
 	if issuerseen {
 		fmt.Fprintf(os.Stderr, green+"INFO"+def+": key 'issuer' ignored\n"+def)
 	}
@@ -676,6 +681,9 @@ func main() {
 		}
 		if sizeflag == 1 { // Previous argument was -s/--size
 			size = arg
+			if size != "5" && size != "6" && size != "7" && size != "8" {
+				usage("size can only be 5, 6, 7 or 8")
+			}
 			sizeflag = 2
 			continue
 		}

@@ -185,7 +185,7 @@ func saveDb(db *dbase) error {
 
 	encryptedData := aesGcm.Seal(nil, nonce, gobBuf.Bytes(), nil)
 	buf.Write(encryptedData)
-	err = ioutil.WriteFile(dbPath, buf.Bytes(), 0600)
+	err = atomicWrite(dbPath, buf.Bytes(), 0600)
 	if err != nil {
 		return errors.New("datafile write error")
 	}
