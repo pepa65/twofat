@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version    = "2.2.22"
+	version    = "2.2.23"
 	maxNameLen = 20
 	period     = 30
 )
@@ -736,7 +736,7 @@ func main() {
 			case "help", "--help", "-h":
 				usage("")
 			case "version", "--version", "-V":
-				fmt.Fprintln(os.Stderr, self+" version "+version)
+				fmt.Fprintln(os.Stderr, self+" v"+version)
 				return
 
 			case "show", "view":
