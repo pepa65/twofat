@@ -1,4 +1,4 @@
-module github.com/pepa65/twofat
+module github.com/pepa65/twofat/v3
 
 go 1.27.1
 
