@@ -26,7 +26,7 @@ import (
 )
 
 const (
-	version    = "2.3.0"
+	version    = "3.0.0"
 	maxNameLen = 20
 	period     = 30
 )
@@ -564,9 +564,9 @@ func importEntries(filename string) {
 
 		if len(name) > maxNameLen {
 			if force {
-				fmt.Fprintf(os.Stderr, yellow+"WARNING"+def+": NAME longer than %d on line %d\n", maxNameLen, n)
+				fmt.Fprintf(os.Stderr, yellow+"WARNING"+def+": NAME longer than %d on line %d: %v\n", maxNameLen, n, name)
 			} else {
-				exitOnError(errr, fmt.Sprintf("NAME longer than %d on line %d", maxNameLen, n))
+				exitOnError(errr, fmt.Sprintf("NAME longer than %d on line %d: %v", maxNameLen, n, name))
 			}
 		}
 

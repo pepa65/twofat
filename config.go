@@ -21,9 +21,13 @@ import (
 )
 
 const (
+	dbversion         = 3
 	aesKeySize uint32 = 32
 	nonceSize         = 12
 	pwRetry           = 3
+	time_passes       = 90
+	memory            = 262144
+	threads           = 4
 	cls               = "\033c"
 	red               = "\033[1;31m"
 	green             = "\033[1;32m"
@@ -40,7 +44,7 @@ var (
 	errWrongPassword = errors.New("password error")
 )
 
-type entry struct { // v2.x.y
+type entry struct { // v2.x.y and v3.x.y
 	Secret    []byte
 	Digits    string
 	Algorithm string
@@ -58,8 +62,9 @@ type entryV0 struct { // v0.x.y
 }
 
 type dbase struct {
-	Pwd     []byte
-	Entries map[string]entry
+	DbVersion byte
+	Pwd       []byte
+	Entries   map[string]entry
 	EntriesV1 map[string]entryV1
 	EntriesV0 map[string]entryV0
 }
@@ -83,7 +88,7 @@ func init() {
 }
 
 func deriveKey(password []byte, salt []byte, hashLen uint32) (hashRaw []byte) {
-	return argon2.IDKey(password, salt, 3, 65536, 4, hashLen)
+	return argon2.IDKey(password, salt, time_passes, memory, threads, hashLen)
 }
 
 func readDb(clearscr bool) (dbase, error) {
@@ -98,8 +103,12 @@ func readDb(clearscr bool) (dbase, error) {
 			return dbase{}, errors.New("insufficient data in " + dbPath)
 		}
 
-		nonce := dbdata[:nonceSize]
-		encdata := dbdata[nonceSize:]
+		if dbdata[0] != dbversion {
+			return dbase{}, errors.New("Not verion 3 of database format")
+		}
+
+		nonce := dbdata[1:nonceSize+1]
+		encdata := dbdata[nonceSize+1:]
 		if !redirected {
 			fmt.Fprintln(os.Stderr, "Datafile: "+blue+dbPath+def)
 		}
@@ -165,6 +174,7 @@ func saveDb(db *dbase) error {
 		return errors.New("could not get randomized data")
 	}
 
+	buf.WriteByte(dbversion)
 	buf.Write(nonce)
 	key := deriveKey(db.Pwd, nonce, aesKeySize)
 	block, err := aes.NewCipher(key)

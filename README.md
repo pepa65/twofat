@@ -1,18 +1,19 @@
-[![GoDoc](https://godoc.org/github.com/pepa65/twofat?status.svg)](https://godoc.org/github.com/pepa65/twofat)
-[![GitHub](https://img.shields.io/github/license/pepa65/twofat.svg)](LICENSE)
-# twofat v2.3.0
+# twofat
 <img src="https://raw.githubusercontent.com/pepa65/twofat/master/twofat.png" width="96" alt="twofat icon" align="right">
 
 ## Manage TOTPs from CLI
+* **v3.0.0**
 * Repo: [github.com/pepa65/twofat](https://github.com/pepa65/twofat)
 * After: [github.com/slandx/tfat](https://github.com/slandx/tfat)
 * Contact: github.com/pepa65
 * License: GPLv3+
 * Install: `wget -qO- gobinaries.com/pepa65/twofat |sh`
 * Migration from pre v1.0.0 versions of twofat:
-  **Export the data with twofat v0 and import that with twofat v1.**
+  **Export the data with twofat v0 and import it with twofat v1.**
 * Migration from pre v2.0.0 versions of twofat:
-  **Export the data with twofat v1 (or v0) and import that with twofat v2.**
+  **Export the data with twofat v1 (or v0) and import it with twofat v2.**
+* Migration from pre V3.0.0 versions of twofat:
+  **Export the data with twofat v2 (or v0, or v1) and import it with twofat v3.**
 
 ### Features
 * Data saved with AES-GCM encrypt in ~/.twofat.enc (by default).
@@ -33,6 +34,10 @@
     There is no maximum length for a SECRET in twofat.
   - A 30 second timeout seems to be more or less universal, and twofat only supports 30 for period LENGTH.
     (Making this shorter does little to prevent the success of brute-force attacks.)
+* Version 3 is hardened against brute-force attack on the Argon2i encryption as compared to v0-2
+  with the time/passes parameter increased thirtyfold to 90 from 3, and the memory needed to 256MiB from 64MiB.
+  On less powerful hardware this means seconds to decrypt, but the reward is: harder to crack.
+  (People wanting a very fast decryption can use `twofat v2`.)
 
 ## Build
 ```shell
@@ -59,7 +64,7 @@ CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -ldflags="-s -w" -o twofat_andr
 
 ## Usage
 ```
-twofat v2.3.0 - Manage TOTPs from CLI
+twofat v3.0.0 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. Password can be piped in.
 When output is redirected, only pertinent plain text is sent to Stdout.
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
