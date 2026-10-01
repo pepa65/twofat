@@ -8,7 +8,4 @@ require (
 	golang.org/x/term v0.46.0
 )
 
-require (
-	github.com/google/renameio/v2 v2.0.2 // indirect
-	golang.org/x/sys v0.48.0 // indirect
-)
+require golang.org/x/sys v0.48.0 // indirect
