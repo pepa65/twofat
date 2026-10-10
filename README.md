@@ -1,6 +1,6 @@
 [![GoDoc](https://godoc.org/github.com/pepa65/twofat/v3?status.svg)](https://godoc.org/github.com/pepa65/twofat/v3)
 [![GitHub](https://img.shields.io/github/license/pepa65/twofat.svg)](LICENSE)
-# twofat v3.0.2
+# twofat v3.0.3
 <img src="https://raw.githubusercontent.com/pepa65/twofat/master/twofat.png" width="96" alt="twofat icon" align="right">
 
 ## Manage TOTPs from CLI
@@ -65,7 +65,7 @@ CGO_ENABLED=0 GOOS=android GOARCH=arm64 go build -ldflags="-s -w" -o twofat_andr
 
 ## Usage
 ```
-twofat v3.0.2 - Manage TOTPs from CLI
+twofat v3.0.3 - Manage TOTPs from CLI
 The CLI is interactive & colorful, output to Stderr. Password can be piped in.
 When output is redirected, only pertinent plain text is sent to Stdout.
 * Repo:       github.com/pepa65/twofat <pepa65@passchier.net>
